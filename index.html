@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gymlog">
+<meta name="theme-color" content="#14181F">
+<title>Gymlog — trainingsschema &amp; voortgang</title>
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#14181F;
+  --bg2:#1B2029;
+  --card:#202632;
+  --card2:#262D3B;
+  --line:#333B4C;
+  --ink:#EDEFF2;
+  --ink2:#9AA3B2;
+  --ink3:#6C7686;
+  --acc:#FFD84D;
+  --acc-ink:#1A1503;
+  --ok:#5BD98A;
+  --danger:#FF6B6B;
+  --radius:14px;
+  font-size:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:-apple-system,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  font-size:1rem;line-height:1.45;
+  padding-bottom:calc(76px + env(safe-area-inset-bottom));
+  -webkit-font-smoothing:antialiased;
+  user-select:none;
+}
+input,select{user-select:text}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* header */
+header{
+  padding:calc(env(safe-area-inset-top) + 14px) 18px 10px;
+  position:sticky;top:0;background:var(--bg);z-index:20;
+  display:flex;align-items:baseline;gap:10px;
+}
+header h1{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
+header .date{color:var(--ink3);font-size:.85rem}
+main{padding:0 14px}
+.view{display:none}
+.view.on{display:block}
+
+/* cards */
+.card{background:var(--card);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
+.card h2{font-size:1.05rem;font-weight:700;margin-bottom:8px}
+.card h3{font-size:.95rem;font-weight:650}
+.muted{color:var(--ink2);font-size:.88rem}
+
+/* tab bar */
+nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  background:var(--bg2);border-top:1px solid var(--line);
+  display:flex;justify-content:space-around;
+  padding:8px 0 calc(8px + env(safe-area-inset-bottom));
+}
+nav button{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  font-size:.66rem;color:var(--ink3);padding:4px 8px;border-radius:10px;min-width:58px;
+}
+nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--acc)}
+
+/* generic controls */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  background:var(--card2);border-radius:12px;padding:12px 18px;font-weight:650;font-size:.95rem;
+}
+.btn.acc{background:var(--acc);color:var(--acc-ink)}
+.btn.wide{width:100%}
+.btn.small{padding:8px 12px;font-size:.85rem;border-radius:10px}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink2)}
+.btn.danger{color:var(--danger);border:1px solid transparent;background:transparent;font-weight:600}
+.row{display:flex;align-items:center;gap:10px}
+.row .grow{flex:1;min-width:0}
+textarea{
+  background:var(--bg2);border:1px solid var(--line);color:var(--ink);
+  border-radius:10px;padding:9px 10px;font-size:1rem;width:100%;
+  font-family:inherit;resize:vertical;line-height:1.45;
+}
+.d-edit{display:grid;gap:10px;margin-top:4px;padding-bottom:4px}
+input[type=number],input[type=text],select{
+  background:var(--bg2);border:1px solid var(--line);color:var(--ink);
+  border-radius:10px;padding:9px 10px;font-size:1rem;width:100%;
+}
+select{appearance:none;-webkit-appearance:none}
+.field label{display:block;font-size:.78rem;color:var(--ink3);margin-bottom:4px}
+
+/* steppers */
+.stepper{display:flex;align-items:center;gap:2px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stepper button{width:34px;height:38px;font-size:1.15rem;color:var(--ink2);flex:none}
+.stepper button:active{background:var(--card2)}
+.stepper .val{min-width:52px;text-align:center;font-weight:700;font-size:1.05rem}
+.stepper .unit{color:var(--ink3);font-size:.75rem;font-weight:400;margin-left:2px}
+
+/* live session */
+.ex-block{margin-bottom:14px}
+.ex-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px}
+.ex-head h3{font-size:1.05rem}
+.prev{color:var(--ink3);font-size:.8rem;margin-bottom:8px}
+.sugg{color:var(--acc);font-size:.8rem;font-weight:600;margin:-4px 0 8px}
+.prev b{color:var(--ink2);font-weight:600}
+.set-row{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg2);border:1px solid var(--line);border-radius:12px;
+  padding:8px 10px;margin-bottom:7px;
+}
+.set-row .idx{width:24px;height:24px;border-radius:50%;background:var(--card2);color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;flex:none}
+.set-row.done{border-color:rgba(91,217,138,.5)}
+.set-row.done .idx{background:var(--ok);color:#06130B}
+.done-btn{
+  width:44px;height:44px;border-radius:12px;flex:none;
+  border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;
+}
+.done-btn svg{width:22px;height:22px;stroke:var(--ink3);stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.set-row.done .done-btn{background:var(--ok);border-color:var(--ok)}
+.set-row.done .done-btn svg{stroke:#06130B}
+
+/* week */
+.week-day{
+  display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);
+}
+.week-day:last-child{border-bottom:none}
+.week-day .d{width:34px;font-weight:700;font-size:.9rem;flex:none}
+.week-day select{max-width:170px}
+.chip{
+  font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:999px;
+  background:var(--card2);color:var(--ink2);flex:none;
+}
+.chip.on{background:var(--acc);color:var(--acc-ink)}
+.switch{width:46px;height:28px;border-radius:999px;background:var(--card2);position:relative;flex:none;transition:background .15s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--ink3);transition:all .15s}
+.switch.on{background:var(--acc)}
+.switch.on::after{left:21px;background:var(--acc-ink)}
+
+/* template editor */
+.tpl-head{display:flex;align-items:center;gap:10px}
+.tpl-name{font-weight:700;font-size:1rem}
+.tpl-list{margin-top:10px}
+.tpl-ex{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.tpl-ex .meta{color:var(--ink3);font-size:.78rem;flex:none;white-space:nowrap}
+.tpl-ex select{padding:5px 6px;font-size:.85rem;width:auto;max-width:150px;flex:0 0 auto}
+.mini{width:30px;height:30px;border-radius:8px;background:var(--card2);color:var(--ink2);display:flex;align-items:center;justify-content:center;flex:none;font-size:1rem}
+
+/* charts */
+.chart-wrap{margin:6px 0 4px}
+.chart-wrap svg{width:100%;height:auto;display:block}
+.metric-toggle{display:flex;gap:6px;margin:8px 0 12px;flex-wrap:wrap}
+.metric-toggle button{padding:7px 13px;border-radius:999px;background:var(--card);color:var(--ink2);font-size:.82rem;font-weight:600}
+.metric-toggle button.on{background:var(--acc);color:var(--acc-ink)}
+select.exercise-select{margin-bottom:8px}
+.legend{display:flex;gap:16px;color:var(--ink3);font-size:.75rem;margin-top:4px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:1px}
+
+/* misc */
+.empty{color:var(--ink3);font-size:.9rem;padding:14px 4px;text-align:center}
+.history-item{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.history-item:last-child{border:none}
+.history-item .d{color:var(--ink2);flex:none}
+.history-item .s{color:var(--ink3);font-size:.8rem;text-align:right}
+#toast{
+  position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(8px);
+  background:var(--acc);color:var(--acc-ink);font-weight:700;font-size:.9rem;
+  padding:11px 20px;border-radius:999px;opacity:0;pointer-events:none;transition:all .25s;z-index:50;white-space:nowrap;
+}
+#toast.show{opacity:1;transform:translateX(-50%)}
+.section-title{font-size:.8rem;font-weight:700;color:var(--ink3);letter-spacing:.04em;text-transform:uppercase;margin:18px 4px 8px}
+
+/* oefeningen-picker */
+#picker{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;justify-content:flex-end}
+#picker.on{display:flex}
+.picker-backdrop{position:absolute;inset:0;background:rgba(8,10,14,.65)}
+.picker-card{
+  position:relative;background:var(--bg2);border-radius:20px 20px 0 0;
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  max-height:84vh;display:flex;flex-direction:column;
+}
+.picker-card .row{margin-bottom:4px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
+.chips button{padding:6px 12px;border-radius:999px;background:var(--card);color:var(--ink2);font-size:.8rem;font-weight:600}
+.chips button.on{background:var(--acc);color:var(--acc-ink)}
+.picker-list{overflow-y:auto;flex:1;margin-top:4px;-webkit-overflow-scrolling:touch}
+.p-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 6px;border-bottom:1px solid var(--line);font-size:.93rem;width:100%;text-align:left}
+.p-item:active{background:var(--card)}
+.p-item .g{color:var(--ink3);font-size:.72rem;flex:none}
+.p-item.added{color:var(--ink3)}
+.p-item.added .g{color:var(--ok);font-weight:700}
+.p-new{color:var(--acc);font-weight:650}
+
+/* oefening-detail */
+.p-detail{padding:4px 2px}
+.p-back{display:flex;align-items:center;gap:8px;color:var(--ink2);font-size:.85rem;padding:10px 4px;font-weight:650}
+.p-detail h3{font-size:1.15rem;margin:6px 0 2px}
+.d-group{color:var(--ink3);font-size:.8rem;margin-bottom:12px}
+.d-muscle{font-size:.85rem;color:var(--ink2);margin:0 0 12px}
+.d-muscle b{color:var(--ink);font-weight:650}
+.d-steps{margin:0 0 14px;padding-left:20px;display:grid;gap:8px;font-size:.9rem;color:var(--ink2);line-height:1.45}
+.d-steps b{color:var(--ink)}
+.d-tip{background:var(--card);border-left:3px solid var(--acc);border-radius:0 10px 10px 0;padding:9px 12px;font-size:.85rem;color:var(--ink2);line-height:1.45}
+.d-tip b{color:var(--acc)}
+
+/* metingen */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-grid .full{grid-column:1/-1}
+#m-history .history-item{align-items:flex-start}
+#m-history .parts{color:var(--ink2);font-size:.8rem;margin-top:2px}
+#m-history .parts b{color:var(--ink);font-weight:650}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="hdr-title">Training</h1>
+  <span class="date" id="hdr-date"></span>
+</header>
+
+<main>
+  <!-- ===== VANDAAG ===== -->
+  <section class="view on" id="view-today">
+    <div id="today-none" class="card">
+      <h2>Vandaag geen training ingepland</h2>
+      <p class="muted">Je kunt toch trainen door hieronder een schema te kiezen.</p>
+      <div class="row" style="margin-top:12px">
+        <select id="pick-template" class="grow"></select>
+        <button class="btn small acc" id="btn-start-anyway">Start</button>
+      </div>
+    </div>
+    <div id="today-planned" class="card" style="display:none">
+      <div class="row">
+        <div class="grow">
+          <h2 id="today-tpl-name"></h2>
+          <p class="muted" id="today-tpl-sub"></p>
+        </div>
+      </div>
+      <button class="btn acc wide" id="btn-start-planned" style="margin-top:12px">Start training</button>
+    </div>
+
+    <div id="session" style="display:none">
+      <div class="card">
+        <div class="row">
+          <div class="grow">
+            <h2 id="s-title"></h2>
+            <p class="muted" id="s-sub"></p>
+          </div>
+          <button class="btn small ghost" id="btn-cancel-session">Afbreken</button>
+        </div>
+      </div>
+      <div id="s-exercises"></div>
+      <button class="btn acc wide" id="btn-finish">Training voltooien</button>
+      <div style="height:8px"></div>
+    </div>
+
+    <div class="section-title">Recente sessies</div>
+    <div class="card" id="recent-list"></div>
+  </section>
+
+  <!-- ===== SCHEMA ===== -->
+  <section class="view" id="view-plan">
+    <div class="section-title">Trainingsdagen</div>
+    <div class="card" id="week"></div>
+
+    <div class="section-title">Schema's</div>
+    <div id="templates"></div>
+    <button class="btn wide" id="btn-new-tpl" style="margin-bottom:6px">+ Nieuw schema</button>
+
+    <div class="section-title">Oefeningen</div>
+    <div class="card">
+      <p class="muted">Jouw oefeningenlijst. Kies uit de bibliotheek of maak eigen oefeningen aan.</p>
+      <button class="btn acc wide" id="btn-open-library" style="margin:12px 0">+ Oefening uit bibliotheek</button>
+      <div id="exercise-list" class="tpl-list"></div>
+    </div>
+  </section>
+
+  <!-- ===== VOORTGANG ===== -->
+  <section class="view" id="view-progress">
+    <div class="card">
+      <h2>Grafiek per oefening</h2>
+      <select id="chart-exercise" class="exercise-select"></select>
+      <div class="metric-toggle" id="metric-toggle">
+        <button data-m="top" class="on">Gewicht</button>
+        <button data-m="e1rm">e1RM</button>
+        <button data-m="vol">Volume</button>
+      </div>
+      <div class="chart-wrap" id="chart-line"></div>
+      <div class="legend"><span><i style="background:var(--acc)"></i>per sessie</span></div>
+    </div>
+    <div class="card">
+      <h2>Totaalvolume per week</h2>
+      <div class="chart-wrap" id="chart-week"></div>
+      <div class="legend"><span><i style="background:var(--ink2)"></i>kg × herhalingen</span></div>
+    </div>
+    <div class="card">
+      <h2>Persoonlijke records</h2>
+      <div id="pr-list"></div>
+    </div>
+  </section>
+
+  <!-- ===== METINGEN ===== -->
+  <section class="view" id="view-metingen">
+    <div class="card">
+      <h2>Nieuwe meting</h2>
+      <p class="muted">Vul in wat je weegschaal of meetlint geeft — lege velden sla je over. Dezelfde datum opnieuw invoeren overschrijft de vorige meting van die dag. De richtlijnen bij de grafiek hieronder zijn algemene indicaties voor volwassenen, geen medisch advies.</p>
+      <div class="form-grid" style="margin-top:12px">
+        <div class="field full"><label>Datum</label><input type="date" id="m-date"></div>
+        <div class="field"><label>Gewicht (kg)</label><input type="number" step="any" inputmode="decimal" id="m-w"></div>
+        <div class="field"><label>Lichaamsvet (%)</label><input type="number" step="any" inputmode="decimal" id="m-fat"></div>
+        <div class="field"><label>Spiermassa (kg)</label><input type="number" step="any" inputmode="decimal" id="m-muscle"></div>
+        <div class="field"><label>Beendermassa (kg)</label><input type="number" step="any" inputmode="decimal" id="m-bone"></div>
+        <div class="field"><label>BMI</label><input type="number" step="any" inputmode="decimal" id="m-bmi"></div>
+        <div class="field"><label>BMR / DCI (kcal)</label><input type="number" step="any" inputmode="decimal" id="m-bmr"></div>
+        <div class="field"><label>Metabolische leeftijd (jr)</label><input type="number" step="any" inputmode="decimal" id="m-mage"></div>
+        <div class="field"><label>Lichaamswater (%)</label><input type="number" step="any" inputmode="decimal" id="m-water"></div>
+        <div class="field"><label>Visceraal vet (niveau)</label><input type="number" step="any" inputmode="decimal" id="m-visc"></div>
+        <div class="field"><label>Navel (cm)</label><input type="number" step="any" inputmode="decimal" id="m-navel"></div>
+        <div class="field"><label>Taille (cm)</label><input type="number" step="any" inputmode="decimal" id="m-taille"></div>
+        <div class="field"><label>Heup (cm)</label><input type="number" step="any" inputmode="decimal" id="m-heup"></div>
+      </div>
+      <button class="btn acc wide" id="btn-save-meting" style="margin-top:12px">Meting opslaan</button>
+    </div>
+
+    <div class="card">
+      <h2>Voortgang</h2>
+      <select id="m-metric" style="margin-bottom:8px"></select>
+      <div class="chart-wrap" id="chart-meting"></div>
+      <div class="legend"><span><i style="background:var(--acc)"></i>per meting</span></div>
+      <p class="muted" id="m-guide" style="margin-top:10px;font-size:.83rem;line-height:1.5"></p>
+    </div>
+
+    <div class="card">
+      <h2>Historie</h2>
+      <div id="m-history"></div>
+    </div>
+  </section>
+
+  <!-- ===== MEER ===== -->
+  <section class="view" id="view-more">
+    <div class="section-title">Gegevens</div>
+    <div class="card">
+      <p class="muted" style="margin-bottom:12px">Alles staat opgeslagen op je telefoon. Maak regelmatig een exportbestand als back-up (bijv. na elke maand of na het aanpassen van je schema).</p>
+      <div class="row">
+        <button class="btn grow" id="btn-export">Back-up maken</button>
+        <button class="btn grow" id="btn-import">Back-up laden</button>
+      </div>
+      <input type="file" id="import-file" accept=".json" style="display:none">
+    </div>
+    <div class="section-title">App</div>
+    <div class="card">
+      <p class="muted"><b style="color:var(--ink2)">Op je homescreen zetten (iPhone):</b> deel-knop <span style="color:var(--acc)">⎋</span> → “Zet op het beginscherm”.<br><br>
+      <b style="color:var(--ink2)">Android:</b> menu ⋮ → “Toevoegen aan startscherm”.<br><br>
+      De app werkt daarna volledig offline.</p>
+    </div>
+    <div class="section-title">Gevarenzone</div>
+    <div class="card">
+      <button class="btn danger" id="btn-reset">Alle gegevens wissen</button>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-tab="today" class="on">
+    <svg viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>
+    Training
+  </button>
+  <button data-tab="plan">
+    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+    Schema
+  </button>
+  <button data-tab="progress">
+    <svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l3.5-4 3 2.5L19 8"/></svg>
+    Voortgang
+  </button>
+  <button data-tab="metingen">
+    <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8.5 10a4.5 4.5 0 0 1 7 0"/><path d="M12 10l1.8-2.4"/></svg>
+    Metingen
+  </button>
+  <button data-tab="more">
+    <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+    Meer
+  </button>
+</nav>
+
+<div id="picker">
+  <div class="picker-backdrop" data-close></div>
+  <div class="picker-card">
+    <div class="row">
+      <input type="text" id="picker-search" placeholder="Zoek oefening…" class="grow" autocomplete="off">
+      <button class="btn small ghost" data-close>Sluit</button>
+    </div>
+    <div class="chips" id="picker-chips"></div>
+    <div class="picker-list" id="picker-list"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ================= data ================= */
+const LS_KEY="gymlog.v1";
+const DEFAULT_EX=["Bankdrukken","Squat","Deadlift","Schouderdrukken (staand)","Lat pulldown","Roeien (kabel)","Biceps curl","Triceps pushdown","Leg press","Leg extension","Leg curl","Hyperextension","Push-up","Plank"];
+const DAYS=["Ma","Di","Wo","Do","Vr","Za","Zo"];
+const DAYS_FULL=["maandag","dinsdag","woensdag","donderdag","vrijdag","zaterdag","zondag"];
+
+let db=load();
+function defaults(){
+  const mk=n=>({id:uid(),name:n});
+  const t={push:"Push (borst/schouder/triceps)",pull:"Pull (rug/biceps)",legs:"Legs"};
+  return {
+    exercises:DEFAULT_EX.map(mk),
+    templates:[
+      {id:uid(),name:t.push,ex:[{e:"Bankdrukken",sets:4,reps:8},{e:"Schouderdrukken (staand)",sets:3,reps:10},{e:"Lat pulldown",sets:3,reps:12},{e:"Triceps pushdown",sets:3,reps:12}]},
+      {id:uid(),name:t.pull,ex:[{e:"Deadlift",sets:3,reps:5},{e:"Roeien (kabel)",sets:3,reps:10},{e:"Biceps curl",sets:3,reps:12},{e:"Hyperextension",sets:2,reps:12}]},
+      {id:uid(),name:t.legs,ex:[{e:"Squat",sets:4,reps:6},{e:"Leg press",sets:3,reps:10},{e:"Leg curl",sets:3,reps:12}]}
+    ],
+    week:Array.from({length:7},()=>({on:false,tpl:null})),
+    sessions:[],
+    measurements:[],
+    details:{},
+    lastWeights:{}
+  };
+}
+function load(){
+  try{const raw=localStorage.getItem(LS_KEY);if(!raw)return defaults();
+    const d=JSON.parse(raw);const base=defaults();
+    for(const k in base) if(d[k]===undefined) d[k]=base[k];
+    /* oude versies hadden ma/wo/vr standaard op "train": ruim dagen zonder schema op */
+    if(d.week) d.week.forEach(wd=>{if(wd.on&&!wd.tpl)wd.on=false;});
+    return d;
+  }catch(e){return defaults()}
+}
+function save(){localStorage.setItem(LS_KEY,JSON.stringify(db));}
+function uid(){return Math.random().toString(36).slice(2,10);}
+function todayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function dayIndex(d=new Date()){return (d.getDay()+6)%7;} /* ma=0 */
+function fmtDate(s){const [y,m,dd]=s.split("-");return dd+"-"+m+"-"+y;}
+function nl(s){return s;}
+function exerciseName(id){const e=db.exercises.find(x=>x.id===id);return e?e.name:"?";}
+function exIdByName(n){const e=db.exercises.find(x=>x.name===n);return e?e.id:null;}
+
+let toastT=null;
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),2200);}
+
+/* ================= tabs ================= */
+const TITLES={today:"Training",plan:"Schema",progress:"Voortgang",metingen:"Metingen",more:"Meer"};
+document.querySelectorAll("nav button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
+    document.getElementById("view-"+b.dataset.tab).classList.add("on");
+    document.getElementById("hdr-title").textContent=TITLES[b.dataset.tab];
+    window.scrollTo(0,0);
+    if(b.dataset.tab==="progress") renderProgress();
+    if(b.dataset.tab==="metingen") renderMetingen();
+    if(b.dataset.tab==="plan") renderPlan();
+    if(b.dataset.tab==="today") renderToday();
+  });
+});
+document.getElementById("hdr-date").textContent=new Date().toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"long"});
+
+/* ================= live session ================= */
+let session=null; /* {templateId, entries:[{exerciseId, sets:[{w,r,done}]}]} */
+const DRAFT_KEY="gymlog.draft";
+
+function startSession(tplId){
+  const tpl=db.templates.find(t=>t.id===tplId); if(!tpl)return;
+  session={templateId:tplId,date:todayStr(),entries:tpl.ex.map(x=>{
+    const exId=exIdByName(x.e);
+    const prev=lastSessionFor(exId);
+    const pw=prev?prev.sets.map(s=>s.w||0):[];
+    return {exerciseId:exId,sets:Array.from({length:x.sets},(_,i)=>({
+      w:pw[i]!==undefined?pw[i]:(pw.length?pw[pw.length-1]:(db.lastWeights[x.e]||0)),
+      r:x.reps,done:false}))};
+  })};
+  persistDraft();
+  renderSession();
+}
+function startEmptySession(){
+  session={templateId:null,date:todayStr(),entries:[]};
+  persistDraft();renderSession();
+}
+function persistDraft(){ if(session&&session.entries.length&&!isFinished(session)) localStorage.setItem(DRAFT_KEY,JSON.stringify(session)); else localStorage.removeItem(DRAFT_KEY); }
+function isFinished(s){return s.entries.every(e=>e.sets.every(st=>st.done));}
+function restoreDraft(){
+  try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||"null");
+    if(d&&d.date===todayStr()){session=d;return true;}
+  }catch(e){}
+  return false;
+}
+
+function lastSessionFor(exId){
+  for(const s of [...db.sessions].reverse()){
+    const e=s.entries.find(x=>x.exerciseId===exId);
+    const done=e?e.sets.filter(st=>st.done||st.w>0):[];
+    if(done.length)return {date:s.date,sets:done};
+  }
+  return null;
+}
+function bestSet(sets){
+  let best=null,bw=0;
+  for(const s of sets){const w=(+s.w||0)*(1+(+s.r||0)/30);if(w>bw){bw=w;best=s;}}
+  return best;
+}
+
+function renderToday(){
+  const di=dayIndex();
+  const wd=db.week[di];
+  const tpl=wd&&wd.on&&wd.tpl?db.templates.find(t=>t.id===wd.tpl):null;
+  document.getElementById("today-none").style.display=session?"none":"";
+  document.getElementById("today-planned").style.display=(!session&&tpl)?"":"none";
+  document.getElementById("session").style.display=session?"":"none";
+  if(!session){
+    /* fill picker */
+    const sel=document.getElementById("pick-template");
+    sel.innerHTML=db.templates.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")+`<option value="__empty">Lege training</option>`;
+    if(tpl){document.getElementById("today-tpl-name").textContent=tpl.name;
+      document.getElementById("today-tpl-sub").textContent=tpl.ex.map(x=>x.e).join(" · ");}
+  }
+  /* recent */
+  const rl=document.getElementById("recent-list");
+  if(!db.sessions.length){rl.innerHTML=`<div class="empty">Nog geen sessies voltooid. Je eerste sessie verschijnt hier.</div>`;}
+  else{
+    rl.innerHTML=[...db.sessions].reverse().slice(0,8).map(s=>{
+      const name=s.templateId?(db.templates.find(t=>t.id===s.templateId)||{}).name:"Losse training";
+      const vol=s.entries.reduce((a,e)=>a+e.sets.reduce((b,st)=>b+(st.w||0)*(st.r||0),0),0);
+      return `<div class="history-item"><span class="grow"><b>${esc(name)}</b><br><span class="s" style="text-align:left">${fmtDate(s.date)}</span></span><span class="s num">${vol.toLocaleString("nl-NL")} kg totaal</span></div>`;
+    }).join("");
+  }
+  if(session)renderSession();
+}
+
+function renderSession(){
+  if(!session){renderToday();return;}
+  const tpl=session.templateId?db.templates.find(t=>t.id===session.templateId):null;
+  document.getElementById("today-none").style.display="none";
+  document.getElementById("today-planned").style.display="none";
+  document.getElementById("session").style.display="";
+  document.getElementById("s-title").textContent=tpl?tpl.name:"Losse training";
+  document.getElementById("s-sub").textContent="Vink elke set af als je klaar bent";
+
+  const wrap=document.getElementById("s-exercises");
+  wrap.innerHTML=session.entries.map((en,ei)=>{
+    const prev=lastSessionFor(en.exerciseId);
+    const prevTxt=prev?`Vorige (${fmtDate(prev.date)}): `+prev.sets.map(s=>`${s.r}×${s.w} kg`).join(", "):`Eerste keer met deze oefening`;
+    let sugg="";
+    if(prev){
+      const target=en.sets[0].r||8;
+      const allDone=prev.sets.length>=en.sets.length&&prev.sets.every(s=>s.r>=target);
+      const maxW=Math.max(...prev.sets.map(s=>s.w||0));
+      if(allDone&&maxW>0)sugg=`Suggestie: 2,5 kg omhoog → ${Math.round((maxW+2.5)*10)/10} kg`;
+      else if(allDone)sugg="Suggestie: extra herhalingen of een set erbij";
+      else sugg=`Suggestie: blijf op ${Math.round(maxW*10)/10} kg en haal eerst alle herhalingen`;
+    }
+    const rows=en.sets.map((st,si)=>`
+      <div class="set-row ${st.done?"done":""}" data-ei="${ei}" data-si="${si}">
+        <span class="idx num">${si+1}</span>
+        ${stepperHTML("w",st.w)}<span style="color:var(--ink3)">×</span>${stepperHTML("r",st.r)}
+        <button class="done-btn" data-act="done"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></button>
+      </div>`).join("");
+    return `<div class="card ex-block">
+      <div class="ex-head"><h3 style="cursor:pointer" data-info="${esc(exerciseName(en.exerciseId))}">${esc(exerciseName(en.exerciseId))}</h3>
+        <button class="btn small ghost" data-act="addset" data-ei="${ei}">+ set</button></div>
+      <p class="prev">${esc(prevTxt)}</p>
+      ${sugg?`<p class="sugg">${esc(sugg)}</p>`:""}
+      <div class="sets">${rows}</div>
+    </div>`;
+  }).join("")+`
+    <div class="card">
+      <button class="btn wide" data-act="addex">+ Oefening</button>
+    </div>`;
+  wrap.querySelectorAll("[data-act]").forEach(el=>el.addEventListener("click",onSessionClick));
+  wrap.querySelectorAll("[data-info]").forEach(el=>el.addEventListener("click",()=>openInfo(el.dataset.info)));
+  wrap.querySelectorAll(".stepper button").forEach(b=>b.addEventListener("click",onStepClick));
+}
+
+function stepperHTML(kind,val){
+  return `<div class="stepper"><button data-kind="${kind}" data-dir="-1">−</button>
+    <span class="val num" data-kind="${kind}">${val}</span>
+    <span class="unit">${kind==="w"?"kg":""}</span>
+    <button data-kind="${kind}" data-dir="1">+</button></div>`;
+}
+function onStepClick(ev){
+  const b=ev.currentTarget;const kind=b.dataset.kind;const dir=+b.dataset.dir;
+  const row=b.closest(".set-row");const ei=+row.dataset.ei,si=+row.dataset.si;
+  const st=session.entries[ei].sets[si];
+  const step=kind==="w"?2.5:1;
+  let v=(+st[kind]||0)+dir*step;
+  if(v<0)v=0;
+  if(kind==="r")v=Math.round(v);
+  st[kind]=Math.round(v*100)/100;
+  /* following sets follow weight */
+  if(kind==="w"){for(let j=si+1;j<session.entries[ei].sets.length;j++) if(!session.entries[ei].sets[j].done) session.entries[ei].sets[j].w=st.w;}
+  persistDraft();
+  const span=row.querySelector(`.val[data-kind="${kind}"]`);if(span)span.textContent=st[kind];
+  /* also update other sets visually */
+  renderSession();
+}
+function onSessionClick(ev){
+  const el=ev.currentTarget;const act=el.dataset.act;
+  const row=el.closest(".set-row");const ei=row?+row.dataset.ei:null,si=row?+row.dataset.si:null;
+  if(act==="done"){
+    const st=session.entries[ei].sets[si];st.done=!st.done;
+    if(st.done){const s=session.entries[ei].sets;const next=s.find((x,j)=>j>si&&!x.done);
+      if(next){next.w=st.w;next.r=st.r;}}
+    persistDraft();
+    if(isFinished(session)){finishSession();return;}
+    renderSession();
+  }else if(act==="addset"){
+    const en=session.entries[ei];const last=en.sets[en.sets.length-1];
+    en.sets.push({w:last?last.w:0,r:last?last.r:0,done:false});persistDraft();renderSession();
+  }else if(act==="addex"){
+    openPicker("session");
+  }
+}
+document.getElementById("btn-start-planned").addEventListener("click",()=>{const wd=db.week[dayIndex()];startSession(wd.tpl);});
+document.getElementById("btn-start-anyway").addEventListener("click",()=>{
+  const v=document.getElementById("pick-template").value;
+  if(v==="__empty")startEmptySession();else startSession(v);
+});
+document.getElementById("btn-cancel-session").addEventListener("click",()=>{
+  const nDone=session.entries.reduce((a,e)=>a+e.sets.filter(s=>s.done).length,0);
+  if(nDone===0||confirm("Training afbreken? De afgevinkte sets gaan verloren.")){session=null;localStorage.removeItem(DRAFT_KEY);renderToday();}
+});
+document.getElementById("btn-finish").addEventListener("click",finishSession);
+function finishSession(){
+  for(const en of session.entries){
+    const ex=db.exercises.find(e=>e.id===en.exerciseId);
+    const best=bestSet(en.sets.filter(s=>s.done));
+    if(ex&&best)db.lastWeights[ex.name]=best.w;
+  }
+  db.sessions.push(session);
+  session=null;localStorage.removeItem(DRAFT_KEY);
+  save();toast("Sessie opgeslagen 🎉");
+  renderToday();
+}
+
+/* ================= schema ================= */
+function renderPlan(){
+  /* week */
+  const w=document.getElementById("week");
+  const tplOpts=db.templates.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("");
+  w.innerHTML=DAYS.map((d,i)=>{
+    const wd=db.week[i];
+    return `<div class="week-day" data-i="${i}">
+      <span class="d">${d}</span>
+      <button class="switch ${wd.on?"on":""}" data-act="toggle"></button>
+      <select data-act="tpl" style="${wd.on?"":"opacity:.4;pointer-events:none"}" class="grow">
+        <option value="">— kies schema —</option>${tplOpts}
+      </select>
+      <span class="chip ${wd.on?"on":""}">${wd.on?"train":"rust"}</span>
+    </div>`;
+  }).join("");
+  w.querySelectorAll(".week-day").forEach(row=>{
+    const i=+row.dataset.i;const wd=db.week[i];
+    const sel=row.querySelector("select");
+    sel.value=wd.tpl||"";
+    sel.addEventListener("change",()=>{wd.tpl=sel.value||null;save();renderPlan();renderToday();});
+    row.querySelector(".switch").addEventListener("click",()=>{wd.on=!wd.on;save();renderPlan();renderToday();});
+  });
+  /* templates */
+  const tl=document.getElementById("templates");
+  if(!db.templates.length){tl.innerHTML=`<div class="card empty">Nog geen schema's. Maak er hieronder één aan.</div>`;}
+  else{
+    tl.innerHTML=db.templates.map(t=>`
+      <div class="card" data-id="${t.id}">
+        <div class="tpl-head">
+          <div class="grow">
+            <div class="tpl-name" data-act="rename">${esc(t.name)}</div>
+            <div class="muted">${t.ex.length} oefeningen</div>
+          </div>
+          <button class="btn small danger" data-act="del">Verwijder</button>
+        </div>
+        <div class="tpl-list">
+          ${t.ex.map((x,xi)=>`
+            <div class="tpl-ex">
+              <select data-xi="${xi}" data-f="e">${db.exercises.map(e=>`<option value="${e.id}" ${exIdByName(x.e)===e.id?"selected":""}>${esc(e.name)}</option>`).join("")}</select>
+              <span class="meta"><input type="number" min="1" max="10" value="${x.sets}" data-xi="${xi}" data-f="sets" style="width:52px;padding:5px 6px;font-size:.85rem"> × <input type="number" min="1" max="30" value="${x.reps}" data-xi="${xi}" data-f="reps" style="width:52px;padding:5px 6px;font-size:.85rem"></span>
+              <button class="mini" data-xi="${xi}" data-act="rmex">−</button>
+            </div>`).join("")}
+          <div style="margin-top:10px">
+            <button class="btn small wide" data-act="addex">+ Oefening</button>
+          </div>
+        </div>
+      </div>`).join("");
+    tl.querySelectorAll(".card[data-id]").forEach(card=>{
+      const t=db.templates.find(x=>x.id===card.dataset.id);
+      card.querySelector("[data-act='rename']").addEventListener("click",()=>{
+        const n=prompt("Naam van het schema:",t.name);if(n&&n.trim()){t.name=n.trim();save();renderPlan();renderToday();}
+      });
+      card.querySelector("[data-act='del']").addEventListener("click",()=>{
+        if(confirm(`Schema “${t.name}” verwijderen?`)){db.templates=db.templates.filter(x=>x.id!==t.id);db.week.forEach(wd=>{if(wd.tpl===t.id)wd.tpl=null;});save();renderPlan();renderToday();}
+      });
+      card.querySelector("[data-act='addex']").addEventListener("click",()=>openPicker("template",t.id));
+      card.querySelectorAll("[data-xi]").forEach(inp=>{
+        inp.addEventListener("change",()=>{
+          const xi=+inp.dataset.xi;const f=inp.dataset.f;
+          if(f==="e")t.ex[xi].e=exerciseName(inp.value);
+          else t.ex[xi][f]=Math.max(1,Math.min(f==="sets"?10:30,+inp.value||1));
+          save();renderToday();
+        });
+      });
+      card.querySelectorAll("[data-act='rmex']").forEach(b=>b.addEventListener("click",()=>{
+        t.ex.splice(+b.dataset.xi,1);save();renderPlan();renderToday();
+      }));
+    });
+  }
+  /* exercise list */
+  document.getElementById("exercise-list").innerHTML=db.exercises.map(e=>`
+    <div class="tpl-ex"><span class="grow" style="cursor:pointer;text-decoration:underline dotted var(--ink3)" data-info="${esc(e.name)}">${esc(e.name)}</span><button class="mini" data-id="${e.id}" data-act="rm">−</button></div>`).join("");
+  document.querySelectorAll("#exercise-list [data-info]").forEach(s=>s.addEventListener("click",()=>openInfo(s.dataset.info)));
+  document.querySelectorAll("#exercise-list [data-act='rm']").forEach(b=>b.addEventListener("click",()=>{
+    const e=db.exercises.find(x=>x.id===b.dataset.id);
+    if(confirm(`Oefening “${e.name}” verwijderen? Bestaande sessies blijven bewaard.`)){db.exercises=db.exercises.filter(x=>x.id!==e.id);save();renderPlan();}
+  }));
+}
+document.getElementById("btn-new-tpl").addEventListener("click",()=>{
+  const n=prompt("Naam van het nieuwe schema:","Nieuw schema");
+  if(!n)return;
+  db.templates.push({id:uid(),name:n.trim(),ex:[]});save();renderPlan();
+});
+
+/* ================= voortgang ================= */
+let metric="top";
+document.getElementById("metric-toggle").addEventListener("click",ev=>{
+  const b=ev.target.closest("button");if(!b)return;
+  metric=b.dataset.m;
+  document.querySelectorAll("#metric-toggle button").forEach(x=>x.classList.toggle("on",x===b));
+  renderProgress();
+});
+
+function svgLine(points,w,h,pad,color){
+  /* points: [{x,y,v}] already scaled to plot area */
+  if(points.length===0)return "";
+  const d=points.map((p,i)=>(i?"L":"M")+p.x.toFixed(1)+" "+p.y.toFixed(1)).join(" ");
+  const first=points[0],last=points[points.length-1];
+  const area=`M${first.x} ${h-pad} L`+points.map(p=>p.x.toFixed(1)+" "+p.y.toFixed(1)).join(" L")+` L${last.x} ${h-pad} Z`;
+  return `<path d="${area}" fill="${color}" opacity="0.12"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`+
+    points.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${color}"/>`).join("");
+}
+function chartSVG(series,w,h,yMin,yMax,color,labels){
+  const pad={l:38,r:10,t:14,b:22};
+  const iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
+  const yr=yMax-yMin||1;
+  const pts=series.map((v,i)=>({x:pad.l+ (series.length===1?iw/2: iw*i/(series.length-1)), y:pad.t+ih-(v-yMin)/yr*ih}));
+  const grid=[0,.5,1].map(f=>{const y=pad.t+ih-f*ih;const val=yMin+f*yr;
+    return `<line x1="${pad.l}" x2="${w-pad.r}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1"/>
+      <text x="${pad.l-6}" y="${y+4}" text-anchor="end" font-size="10" fill="var(--ink3)" class="num">${Math.round(val*10)/10}</text>`;}).join("");
+  const xlab=labels.map((lb,i)=>{
+    if(series.length>6 && i%Math.ceil(series.length/6)!==0)return "";
+    return `<text x="${pts[i].x}" y="${h-6}" text-anchor="middle" font-size="10" fill="var(--ink3)">${esc(lb)}</text>`;}).join("");
+  return `<svg viewBox="0 0 ${w} ${h}">${grid}${svgLine(pts,w,h,pad.b,color)}${xlab}</svg>`;
+}
+
+function renderProgress(){
+  const sel=document.getElementById("chart-exercise");
+  const cur=sel.value|| (db.exercises[0]&&db.exercises[0].id);
+  const known=new Set();
+  db.sessions.forEach(s=>s.entries.forEach(e=>known.add(e.exerciseId)));
+  const opts=db.exercises.filter(e=>known.has(e.id));
+  if(!opts.length){sel.innerHTML=`<option>— voltooi eerst een training —</option>`;
+    document.getElementById("chart-line").innerHTML=`<div class="empty">Zodra je sessies voltooid hebt, staat je voortgang hier.</div>`;
+    document.getElementById("chart-week").innerHTML=`<div class="empty">Nog geen data.</div>`;
+    document.getElementById("pr-list").innerHTML=`<div class="empty">Nog geen records.</div>`;return;}
+  sel.innerHTML=opts.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join("");
+  if(cur&&opts.some(e=>e.id===cur))sel.value=cur;
+  sel.onchange=renderProgress;
+
+  /* per-session series */
+  const hist=[];
+  db.sessions.forEach(s=>{
+    const en=s.entries.find(e=>e.exerciseId===sel.value);if(!en)return;
+    const done=en.sets.filter(st=>st.done&&st.w>0&&st.r>0);
+    if(!done.length)return;
+    const top=Math.max(...done.map(st=>st.w));
+    const e1=Math.max(...done.map(st=>st.w*(1+st.r/30)));
+    const vol=done.reduce((a,st)=>a+st.w*st.r,0);
+    hist.push({date:s.date,top,e1:e1,vol});
+  });
+
+  if(hist.length){
+    const key=metric==="vol"?"vol":(metric==="e1rm"?"e1":"top");
+    const unit=metric==="vol"?"kg":"kg";
+    const vals=hist.map(h=>h[key]);
+    const suffix=metric==="e1rm"?"e1RM ":"";
+    const line=chartSVG(vals,340,190,Math.min(...vals)*0.92,Math.max(...vals)*1.05,"var(--acc)",hist.map(h=>h.date.slice(5)));
+    document.getElementById("chart-line").innerHTML=line;
+    /* history list under chart */
+    const li=document.getElementById("line-history")||document.createElement("div");
+    li.id="line-history";
+    li.innerHTML=hist.slice(-4).reverse().map(h=>`<div class="history-item"><span class="d num">${fmtDate(h.date)}</span><span class="s num">${suffix}${h.top} kg top · ${h.vol.toLocaleString("nl-NL")} kg vol</span></div>`).join("");
+    document.getElementById("chart-line").parentElement.appendChild(li);
+  }else{
+    document.getElementById("chart-line").innerHTML=`<div class="empty">Nog geen gelogde sets voor deze oefening.</div>`;
+  }
+
+  /* weekly volume */
+  const weeks={};
+  db.sessions.forEach(s=>{
+    const d=new Date(s.date);
+    const mon=new Date(d);mon.setDate(d.getDate()-((d.getDay()+6)%7));
+    const k=mon.toISOString().slice(0,10);
+    weeks[k]=(weeks[k]||0)+s.entries.reduce((a,e)=>a+e.sets.filter(st=>st.done).reduce((b,st)=>b+(st.w||0)*(st.r||0),0),0);
+  });
+  const wk=Object.keys(weeks).sort().slice(-8);
+  document.getElementById("chart-week").innerHTML=wk.length?chartSVG(wk.map(k=>weeks[k]),340,170,0,Math.max(...wk.map(k=>weeks[k]))*1.1,"var(--ink2)",wk.map(k=>k.slice(5))):
+    `<div class="empty">Nog geen data.</div>`;
+
+  /* PRs */
+  const byEx={};
+  db.sessions.forEach(s=>s.entries.forEach(en=>{
+    const done=en.sets.filter(st=>st.done&&st.w>0);if(!done.length)return;
+    const cand=done.reduce((a,b)=>a.w*(1+a.r/30)>=b.w*(1+b.r/30)?a:b);
+    if(!byEx[en.exerciseId]||cand.w>byEx[en.exerciseId].w||(cand.w===byEx[en.exerciseId].w&&cand.r>byEx[en.exerciseId].r))
+      byEx[en.exerciseId]={w:cand.w,r:cand.r,date:s.date};
+  }));
+  const prs=Object.entries(byEx).sort((a,b)=>exerciseName(a[0]).localeCompare(exerciseName(b[0])));
+  document.getElementById("pr-list").innerHTML=prs.map(([id,p])=>`<div class="history-item"><span class="grow">${esc(exerciseName(id))}</span><span class="s num">${p.r}×${p.w} kg <span style="color:var(--ink3)">(${fmtDate(p.date)})</span></span></div>`).join("");
+}
+
+/* ================= metingen ================= */
+const METRICS=[
+ ["w","Gewicht","kg","Er is geen vaste norm voor gewicht los van je lengte — gebruik BMI als indicatie (gezond: 18,5–25)."],
+ ["fat","Lichaamsvet","%","Mannen: 6–13% geldt als atletisch, 14–17% fit, 18–24% gemiddeld; ≥25% wordt vaak als verhoogd gezien. Vrouwen liggen doorgaans 8–10% hoger."],
+ ["muscle","Spiermassa","kg","Indicatie mannen: skeletspiermassa van ± 40–50% van je lichaamsgewicht. De trend over tijd is belangrijker dan de absolute waarde."],
+ ["bone","Beendermassa","kg","Indicatie: ± 2,5–4 kg voor mannen (ruwweg 3–5% van je lichaamsgewicht)."],
+ ["bmi","BMI","","Gezond: 18,5–25. Overgewicht: 25–30. Obesitas: ≥30. Let op: bij veel spiermassa kan BMI misleidend hoog zijn."],
+ ["bmr","BMR (DCI)","kcal","Geen gezondheidsnorm — dit is het energieverbruik in rust. Indicatie mannen ±30–45 jaar: 1.600–1.800 kcal per dag, afhankelijk van gewicht en spiermassa."],
+ ["mage","Metabolische leeftijd","jr","Doel: op of onder je kalenderleeftijd. Dit is een schatting van je weegschaal op basis van lichaamssamenstelling, geen medische maat."],
+ ["water","Lichaamswater","%","Mannen: 50–65% is de gebruikelijke range. Vrouwen: 45–60%. Laag waterpercentage hoort vaak samen met hoger vetpercentage."],
+ ["visc","Visceraal vet","","Norm van bio-impedantieweegschalen: 1–9 is gezond, 10–14 verhoogd, ≥15 hoog. Advies bij 10+ is vooral: bewegen en aftanken."],
+ ["navel","Omtrek navel","cm","Richtlijn mannen (risico op hart- en vaatziekten): <94 cm laag risico, 94–102 cm verhoogd, >102 cm sterk verhoogd. Vrouwen: <80 / 80–88 / >88."],
+ ["taille","Taille","cm","Richtlijn mannen: <94 cm laag risico, 94–102 cm verhoogd, >102 cm sterk verhoogd. Vrouwen: <80 / 80–88 / >88 cm."],
+ ["heup","Heup","cm","Losse heupomtrek heeft geen vaste norm — kijk naar de taille/heup-ratio: <0,90 voor mannen en <0,85 voor vrouwen geldt als laag risico."]
+];
+let mMetric="w";
+
+function renderMetingen(){
+  const di=document.getElementById("m-date");
+  if(!di.value)di.value=todayStr();
+  const sel=document.getElementById("m-metric");
+  sel.innerHTML=METRICS.map(m=>`<option value="${m[0]}" ${m[0]===mMetric?"selected":""}>${m[1]}${m[2]?" ("+m[2]+")":""}</option>`).join("");
+  sel.onchange=()=>{mMetric=sel.value;renderMetingen();};
+  document.getElementById("m-guide").textContent="Richtlijn: "+(METRICS.find(m=>m[0]===mMetric)[3]||"—");
+
+  const sorted=[...db.measurements].sort((a,b)=>a.date<b.date?-1:1);
+  const pts=sorted.filter(x=>+x[mMetric]===+x[mMetric]); /* filter leeg/NaN */
+  if(pts.length){
+    const vals=pts.map(p=>+p[mMetric]);
+    const lo=Math.min(...vals),hi=Math.max(...vals);
+    const span=(hi-lo)||hi*0.1||1;
+    document.getElementById("chart-meting").innerHTML=chartSVG(vals,340,190,lo-span*0.15,hi+span*0.15,"var(--acc)",pts.map(p=>p.date.slice(5)));
+  }else{
+    document.getElementById("chart-meting").innerHTML=`<div class="empty">Nog geen metingen voor deze waarde.</div>`;
+  }
+
+  const h=document.getElementById("m-history");
+  if(!db.measurements.length){
+    h.innerHTML=`<div class="empty">Nog geen metingen. Vul hierboven je eerste meting in.</div>`;return;
+  }
+  const rev=[...db.measurements].sort((a,b)=>a.date<b.date?1:-1);
+  h.innerHTML=rev.map(m=>{
+    const parts=METRICS.filter(mk=>+m[mk[0]]===+m[mk[0]])
+      .map(mk=>`${mk[1]} <b class="num">${m[mk[0]]}${mk[2]?" "+mk[2]:""}</b>`).join(" · ");
+    return `<div class="history-item">
+      <span class="grow"><b class="num">${fmtDate(m.date)}</b><div class="parts">${parts}</div></span>
+      <button class="mini" data-del="${m.id}">×</button></div>`;
+  }).join("");
+  h.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{
+    db.measurements=db.measurements.filter(x=>x.id!==b.dataset.del);save();renderMetingen();
+  }));
+}
+document.getElementById("btn-save-meting").addEventListener("click",()=>{
+  const date=document.getElementById("m-date").value||todayStr();
+  const vals={};
+  METRICS.forEach(([k])=>{
+    const el=document.getElementById("m-"+k);
+    const v=parseFloat(el.value);
+    if(!isNaN(v))vals[k]=v;
+  });
+  if(!Object.keys(vals).length){toast("Vul minimaal één waarde in");return;}
+  const existing=db.measurements.find(x=>x.date===date);
+  if(existing)Object.assign(existing,vals);else db.measurements.push({id:uid(),date,...vals});
+  save();toast("Meting opgeslagen");
+  METRICS.forEach(([k])=>document.getElementById("m-"+k).value="");
+  renderMetingen();
+});
+
+/* ================= meer / backup ================= */
+document.getElementById("btn-export").addEventListener("click",()=>{
+  const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="gymlog-backup-"+todayStr()+".json";a.click();
+  URL.revokeObjectURL(a.href);toast("Back-up gedownload");
+});
+document.getElementById("btn-import").addEventListener("click",()=>document.getElementById("import-file").click());
+document.getElementById("import-file").addEventListener("change",ev=>{
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{
+      const d=JSON.parse(r.result);
+      if(!d.exercises||!d.sessions)throw 0;
+      if(confirm("Je huidige gegevens worden vervangen door de back-up. Doorgaan?")){db=d;save();toast("Back-up geladen");renderToday();}
+    }catch(e){toast("Ongeldig back-upbestand");}};
+  r.readAsText(f);ev.target.value="";
+});
+document.getElementById("btn-reset").addEventListener("click",()=>{
+  if(confirm("Alles wissen? Dit kan niet ongedaan worden gemaakt.")){
+    localStorage.removeItem(LS_KEY);localStorage.removeItem(DRAFT_KEY);
+    db=defaults();session=null;save();toast("Gegevens gewist");renderToday();
+  }
+});
+
+/* ================= oefeningenbibliotheek ================= */
+const GROUPS=["Alle","Borst","Rug","Schouders","Biceps","Triceps","Benen","Bil","Core"];
+const EXERCISE_DB=[
+ /* Borst */
+ {n:"Bankdrukken",g:"Borst",m:"chest"},{n:"Bankdrukken met dumbbells",g:"Borst",m:"chest"},{n:"Incline bankdrukken (halter)",g:"Borst",m:"chest"},{n:"Incline dumbbell press",g:"Borst",m:"chest"},{n:"Decline bankdrukken",g:"Borst",m:"chest"},{n:"Machine chest press",g:"Borst",m:"chest"},{n:"Dumbbell fly (vliegbeweging)",g:"Borst",m:"chest"},{n:"Kabelkruisen (cable fly)",g:"Borst",m:"chest"},{n:"Pec deck",g:"Borst",m:"chest"},{n:"Dips (borst gericht)",g:"Borst",m:"chest"},{n:"Push-up",g:"Borst",m:"chest"},{n:"Incline push-up",g:"Borst",m:"chest"},
+ /* Rug */
+ {n:"Deadlift",g:"Rug",m:"back"},{n:"Lat pulldown",g:"Rug",m:"back"},{n:"Pull-up",g:"Rug",m:"back"},{n:"Chin-up",g:"Rug",m:"back"},{n:"Roeien (kabel)",g:"Rug",m:"back"},{n:"Roeien zitend (brede greep)",g:"Rug",m:"back"},{n:"Bent-over row (halter)",g:"Rug",m:"back"},{n:"Eenarmig roeien met dumbbell",g:"Rug",m:"back"},{n:"T-bar row",g:"Rug",m:"back"},{n:"Machine row",g:"Rug",m:"back"},{n:"Straight-arm pulldown",g:"Rug",m:"back"},{n:"Face pull",g:"Rug",m:"back"},{n:"Hyperextension",g:"Rug",m:"back"},{n:"Rack pull",g:"Rug",m:"back"},{n:"Schoudertrekken (shrugs)",g:"Rug",m:"shoulders"},
+ /* Schouders */
+ {n:"Schouderdrukken (staand)",g:"Schouders",m:"shoulders"},{n:"Schouderdrukken (zittend, halter)",g:"Schouders",m:"shoulders"},{n:"Schouderdrukken met dumbbells",g:"Schouders",m:"shoulders"},{n:"Arnold press",g:"Schouders",m:"shoulders"},{n:"Zijwaarts heffen (lateral raise)",g:"Schouders",m:"shoulders"},{n:"Zijwaarts heffen (kabel)",g:"Schouders",m:"shoulders"},{n:"Voorwaarts heffen (front raise)",g:"Schouders",m:"shoulders"},{n:"Reverse fly (rear delt)",g:"Schouders",m:"shoulders"},{n:"Upright row",g:"Schouders",m:"shoulders"},{n:"Landmine press",g:"Schouders",m:"shoulders"},{n:"Pike push-up",g:"Schouders",m:"shoulders"},
+ /* Biceps */
+ {n:"Biceps curl (halter)",g:"Biceps",m:"biceps"},{n:"Biceps curl (dumbbell)",g:"Biceps",m:"biceps"},{n:"Hammer curl",g:"Biceps",m:"biceps"},{n:"Preacher curl",g:"Biceps",m:"biceps"},{n:"Biceps curl (kabel)",g:"Biceps",m:"biceps"},{n:"Concentration curl",g:"Biceps",m:"biceps"},{n:"Incline dumbbell curl",g:"Biceps",m:"biceps"},{n:"Spider curl",g:"Biceps",m:"biceps"},
+ /* Triceps */
+ {n:"Triceps pushdown",g:"Triceps",m:"triceps"},{n:"Frans drukken (skull crusher)",g:"Triceps",m:"triceps"},{n:"Smal bankdrukken (close-grip)",g:"Triceps",m:"triceps"},{n:"Triceps extension boven hoofd (dumbbell)",g:"Triceps",m:"triceps"},{n:"Triceps extension boven hoofd (kabel)",g:"Triceps",m:"triceps"},{n:"Triceps kickback",g:"Triceps",m:"triceps"},{n:"Dips (triceps gericht)",g:"Triceps",m:"triceps"},{n:"Diamond push-up",g:"Triceps",m:"triceps"},
+ /* Benen */
+ {n:"Squat (back squat)",g:"Benen",m:"quads"},{n:"Front squat",g:"Benen",m:"quads"},{n:"Goblet squat",g:"Benen",m:"quads"},{n:"Hack squat",g:"Benen",m:"quads"},{n:"Leg press",g:"Benen",m:"quads"},{n:"Leg extension",g:"Benen",m:"quads"},{n:"Leg curl (liggend)",g:"Benen",m:"hams"},{n:"Leg curl (zittend)",g:"Benen",m:"hams"},{n:"Bulgarian split squat",g:"Benen",m:"quads"},{n:"Uitstappen (lunges)",g:"Benen",m:"quads"},{n:"Opstappen op bank (step-up)",g:"Benen",m:"quads"},{n:"Romanian deadlift",g:"Benen",m:"hams"},{n:"Kuitheffen (staand)",g:"Benen",m:"calves"},{n:"Kuitheffen (zittend)",g:"Benen",m:"calves"},{n:"Kuitheffen op legpress",g:"Benen",m:"calves"},{n:"Sissy squat",g:"Benen",m:"quads"},
+ /* Bil */
+ {n:"Hip thrust (halter)",g:"Bil",m:"glutes"},{n:"Hip thrust (machine)",g:"Bil",m:"glutes"},{n:"Glute bridge",g:"Bil",m:"glutes"},{n:"Sumo deadlift",g:"Bil",m:"glutes"},{n:"Good morning",g:"Bil",m:"hams"},{n:"Cable kickback",g:"Bil",m:"glutes"},{n:"Reverse lunge",g:"Bil",m:"glutes"},{n:"Hip abduction machine",g:"Bil",m:"glutes"},{n:"Hip adductie machine",g:"Bil",m:"glutes"},{n:"45° back extension (billen)",g:"Bil",m:"glutes"},
+ /* Core */
+ {n:"Plank",g:"Core",m:"core"},{n:"Side plank",g:"Core",m:"core"},{n:"Cable crunch",g:"Core",m:"core"},{n:"Beenheffen hangend (leg raises)",g:"Core",m:"core"},{n:"Beenheffen liggend",g:"Core",m:"core"},{n:"Russian twist",g:"Core",m:"core"},{n:"Ab wheel rollout",g:"Core",m:"core"},{n:"Dead bug",g:"Core",m:"core"},{n:"Mountain climbers",g:"Core",m:"core"},{n:"Sit-up",g:"Core",m:"core"},{n:"Pallof press",g:"Core",m:"core"},{n:"Crunch op blok",g:"Core",m:"core"}
+];
+const norm=s=>s.toLowerCase();
+let pickerState={mode:null,tplId:null,group:"Alle",q:"",sel:null};
+
+/* uitleg per oefening: [stap1, stap2, stap3, (stap4), tip] */
+const MUSCLE_LABEL={
+ chest:"Borst · triceps · schouders (voorkant)",
+ back:"Rug · biceps (als hulp)",
+ shoulders:"Schouders · triceps (als hulp)",
+ biceps:"Biceps · onderarmen",
+ triceps:"Triceps (achterkant bovenarm)",
+ quads:"Quadriceps (voorkant bovenbeen) · billen",
+ hams:"Hamstrings (achterkant bovenbeen) · billen",
+ glutes:"Bilspieren · hamstrings",
+ calves:"Kuiten",
+ core:"Buikspieren · diepe core"
+};
+const DETAIL={
+"Bankdrukken":["Lig op de bank met je ogen onder de stang en plant je voeten stevig op de vloer.","Pak de stang iets breder dan schouderbreed en houd hem boven je borst.","Laat de stang gecontroleerd zakken tot je borst, ellebogen ± 45° naar buiten.","Duw explosief omhoog tot je armen gestrekt zijn.", "Tip: span je schouderbladen onder je; duw je voeten in de vloer."],
+"Bankdrukken met dumbbells":["Lig op de bank met een dumbbell in elke hand op borsthoogte.","Duw de dumbbells omhoog tot je armen bijna gestrekt zijn.","Laat ze zakken tot je ellebogen net onder borsthoogte.", "Tip: draai je polsen niet naar achteren; houd ze recht boven je onderarmen."],
+"Bankdrukken incline (halter)":["Stel de bank in op ± 30–45°.","Laat de stang zakken naar je bovenborst.","Duw omhoog tot gestrekte armen.", "Tip: lager op de bank liggen = meer schouderwerk; houd je borst omhoog."],
+"Incline dumbbell press":["Lig op de schuine bank, dumbbells op schouderhoogte.","Duw omhoog in een lichte A-vorm naar elkaar toe.","Laat gecontroleerd zakken tot naast je bovenborst.", "Tip: niet te diep laten zakken; stop als je schouders knellen."],
+"Decline bankdrukken":["Lig op de schuin-omlaagse bank met je voeten vastgeklemd.","Laat de stang zakken naar je onderborst.","Duw omhoog tot gestrekte armen.", "Tip: laat zware pogingen altijd begeleiden (spotten)."],
+"Machine chest press":["Zet de stoel zo dat de handvatten op borsthoogte zitten.","Duw de handvatten uit tot je armen gestrekt zijn.","Laat de handvatten gecontroleerd terugkomen.", "Tip: houd je schouderbladen tegen de rugleuning en je nek ontspannen."],
+"Dumbbell fly (vliegbeweging)":["Lig plat op de bank, dumbbells boven je borst, armen licht gebogen.","Open je armen langs een boog tot je borst rustig rekt.","Sluit je armen weer alsof je iets omarmt.", "Tip: lichte gewichten; de bocht in je ellebogen blijft het hele bewegingspad gelijk."],
+"Kabelkruisen (cable fly)":["Stel beide katrols op borsthoogte en pak een handvat per hand.","Breng je handen voor je borst bij elkaar over een lichte boog.","Open je armen gecontroleerd tot een rechte stretch.", "Tip: knijp je borst 1 seconde samen op het eindpunt."],
+"Pec deck":["Stel de zitting in zodat de handvatten op borsthoogte zijn.","Breng je armen naar elkaar toe tot je borst samenknijpt.","Laat de armen langzaam terug.", "Tip: beweeg vanuit je ellebogen, niet door je schouders op te trekken."],
+"Dips (borst gericht)":["Hang tussen de gelijkbare stangen met je romp licht voorover.","Zak tot je bovenarmen ± evenwijdig aan de vloer zijn.","Duw jezelf omhoog tot gestrekte armen.", "Tip: te diep zakken belast je schouderkapsel; bouw op met hulpweerstand als je nog geen 8× kunt."],
+"Push-up":["Handen iets breder dan schouderbreedte, lijf in één rechte lijn.","Zak tot je borst de vloer bijna raakt.","Duw jezelf omhoog door je handen.", "Tip: span je billen en buik zodat je heup niet doorzakt."],
+"Incline push-up":["Zet je handen op een verhoging (bank, rand).","Voer de push-up uit met een rechte lijn van hoofd tot hielen.","Hoe lager de steun, hoe zwaarder de oefening.", "Tip: de opstap richting gewone push-up."],
+"Deadlift":["Voeten op heupbreedte, greep net buiten je benen, rug recht.","Duw je heupen terug en til de stang als één beweging mee met je benen en rug.","Steek bovenaan je heupen volledig gestrekt en zak gecontroleerd terug.", "Tip: de stang blijft langs je benen; begin elke herhaling opnieuw vanuit een stevige, rechte rug."],
+"Lat pulldown":["Pak de stang iets breder dan schouderbreed, zittend met je benen vastgeklemd.","Trek de stang naar je bovenborst met je ellebogen naar beneden gericht.","Laat de stang gecontroleerd omhoog tot je rug volledig rekt.", "Tip: til niet met je romp mee naar achteren; voel de spanning in je rug, niet in je armen."],
+"Pull-up":["Hang aan de stang met een pronatiegreep (handen van je af).","Druk eerst je schouderbladen naar beneden en trek jezelf op tot je kin boven de stang.","Zak gecontroleerd tot gestrekte armen.", "Tip: te zwaar? Gebruik weerstandsband of doe negatieven (langzaam zakken)."],
+"Chin-up":["Hang aan de stang met een supinatiegreep (handpalmen naar je toe).","Trek jezelf op tot je kin boven de stang.","Zak gecontroleerd omlaag.", "Tip: zelfde beweging als de pull-up, maar je biceps helpen meer mee."],
+"Roeien (kabel)":["Zit met je voeten op de treeplaten, rug recht.","Trek het handvat naar je navel met je ellebogen langs je lijf.","Strek je armen terug tot je rug licht rekt.", "Tip: beweeg uit je ellebogen en schouderbladen, niet door je romp te laten rollen."],
+"Roeien zitend (brede greep)":["Pak het handvat breder dan schouderbreed.","Trek naar je borst met je ellebogen hoog en naar buiten.","Strek terug tot een volledige stretch.", "Tip: richt de belasting richting bovenrug door hoog te trekken."],
+"Bent-over row (halter)":["Kom voorover met een rechte rug, stang onder je schouders hangend.","Trek de stang naar je onderborst met ellebogen langs je lijf.","Laat gecontroleerd zakken.", "Tip: houd je romp vast in dezelfde hoek — zwiep niet op met je rug."],
+"Eenarmig roeien met dumbbell":["Zet één knie en hand op de bank, dumbbell in de andere hand, rug recht.","Trek de dumbbell langs je zij richting je heup.","Laat hem langzaam zakken tot volledige stretch.", "Tip: draai niet met je romp mee; til recht omhoog."],
+"T-bar row":["Ga aan de T-bar staan met je borst tegen de steun (of beide voeten stevig).","Trek de stang richting je borst.","Laat gecontroleerd zakken.", "Tip: borst tegen de steun = geen romp-zwaai mogelijk; prima voor zware gewichten."],
+"Machine row":["Stel de stoel in zodat je handvatten op borsthoogte zitten.","Trek de handvatten naar je toe met ellebogen langs je lijf.","Laat ze gecontroleerd terug.", "Tip: knijp je schouderbladen even samen op het eindpunt."],
+"Straight-arm pulldown":["Sta bij de hoge katrol, armen gestrekt richting de stang.","Druk de stang langs een boog naar je benen tot je rug volledig samenknijpt.","Laat de stang gecontroleerd omhoog.", "Tip: keep je armen gestrekt; dit is een zuivere lat-beweging."],
+"Face pull":["Stel de katrol op gezichtshoogte en pak het touw met je handpalmen naar je toe.","Trek het touw richting je voorhoofd met je ellebogen hoog.","Open je handen aan het einde naar buiten.", "Tip: lichte gewichten — dit is een schoudergezonde oefening, geen krachtrecord."],
+"Hyperextension":["Lig met je heupen op de bank, voeten vastgeklemd.","Zak met je romp gecontroleerd omlaag.","Kom omhoog tot je lijf een rechte lijn is.", "Tip: ga niet verder dan die rechte lijn; duw je heupen tegen de bank."],
+"Rack pull":["Zet de stang in de rek ± op kniehoogte.","Til zoals bij de deadlift: rug recht, heupen terug, stang langs je benen.","Steek bovenaan gestrekt en zak terug.", "Tip: bovenste helft van de deadlift; handig om zwaarder te tillen dan je full deadlift."],
+"Schoudertrekken (shrugs)":["Houd een dumbbell in elke hand langs je zij.","Trek je schouders recht omhoog richting je oren.","Houd even boven en zak langzaam omlaag.", "Tip: rollen met je schouders is onzin — puur recht omhoog en omlaag."],
+"Schouderdrukken (staand)":["Zet de stang op je bovenborst en sta met je voeten op heupbreedte.","Duw de stang boven je hoofd tot je armen gestrekt zijn (hoofd net voorbij).","Laat hem gecontroleerd terug op je borst.", "Tip: beweeg je hoofd net weg voor de stang; leun niet hol."],
+"Schouderdrukken (zittend, halter)":["Zit met rugleuning, stang op schouderhoogte.","Duw de stang boven je hoofd tot gestrekte armen.","Laat hem terug zakken tot je oren.", "Tip: de leuning voorkomt holle rug — gebruik hem ook echt."],
+"Schouderdrukken met dumbbells":["Zit met rugleuning, dumbbells op schouderhoogte, handpalmen naar voren.","Duw omhoog tot de dumbbells bijna elkaar raken boven je hoofd.","Laat ze zakken tot schouderhoogte.", "Tip: niet klapperen met de dumbbells bovenaan; hou ze een handbreedte uit elkaar."],
+"Arnold press":["Houd de dumbbells voor je borst met je handpalmen naar je toe.","Druk omhoog terwijl je je handpalmen naar voren draait.","Draai onderweg terug en zak gecontroleerd.", "Tip: de rotatie activeert je hele schouder — maar blijf strak."],
+"Zijwaarts heffen (lateral raise)":["Houd de dumbbells langs je zij, lichte kniebuiging.","Heef je ellebogen zijwaarts tot schouderhoogte (handen iets lager).","Zak langzaam terug.", "Tip: denk aan ellebogen omhoog, niet handen; zwaaien met je romp helpt niet."],
+"Zijwaarts heffen (kabel)":["Pak met je hand die het verst van de katrol staat het handvat.","Heef je gestrekte arm zijwaarts tot schouderhoogte.","Zak langzaam terug tegen de spanning in.", "Tip: constante spanning, ook onderaan — daarom vaak fijner dan dumbbells."],
+"Voorwaarts heffen (front raise)":["Houd de dumbbells (of stang) voor je lijf.","Heef je gestrekte armen vooruit tot schouderhoogte.","Zak gecontroleerd terug.", "Tip: lichte gewichten; hier zwaaien is de klassieke fout."],
+"Reverse fly (rear delt)":["Kom voorover gebogen (of neem de machine), dumbbells onder je.","Open je armen zijwaarts met licht gebogen ellebogen.","Sluit gecontroleerd weer.", "Tip: richt op de spier tussen je schouderbladen; verklein het gewicht als je schouders meedoen."],
+"Upright row":["Pak de stang op schouderbreedte met je handpalmen naar je toe.","Trek de stang langs je lijf omhoog tot borsthoogte, ellebogen leiden.","Zak gecontroleerd terug.", "Tip: pijn in je schouders? Pak breder of tot borsthoogte in plaats van kin."],
+"Landmine press":["Zet het uiteinde van de stang in de landmine-hoek en pak het andere uiteinde op schouderhoogte.","Druk omhoog-vooruit in een boog tot je arm strekt.","Zak gecontroleerd terug.", "Tip: schouder-vriendelijke drukvariatie met een natuurlijke boog."],
+"Pike push-up":["Kom in de push-uppositie met je heup hoog (pijl-vorm).","Zak met je hoofd tussen je handen richting de vloer.","Duw jezelf omhoog.", "Tip: de zwaarste lichaamsgewicht-schouderdruk; hoe verticaal je heup, hoe zwaarder."],
+"Biceps curl (halter)":["Sta rechtop, stang in je handen op heupbreedte, ellebogen langs je zij.","Krul de stang omhoog tot je biceps volledig samenknijpt.","Zak langzaam — controle, geen zwaai.", "Tip: je ellebogen blijven op hun plek; zak je romp naar achteren, het gewicht is te zwaar."],
+"Biceps curl (dumbbell)":["Houd een dumbbell in elke hand, ellebogen langs je zij.","Krul omhoog terwijl je je onderarm licht draait (palm naar boven).","Zak gecontroleerd terug.", "Tip: afwisselend of tegelijk; draaien activeert extra spiervezels."],
+"Hammer curl":["Houd de dumbbells in neutrale greep (duimen omhoog).","Krul omhoog zonder je pols te draaien.","Zak langzaam terug.", "Tip: richt ook op je onderarm en de buitenkant van je biceps."],
+"Preacher curl":["Rust je bovenarmen op de schuine steun, armen bijna gestrekt.","Krul omhoog tot je biceps samenknijpt.","Zak langzaam tot volle stretch.", "Tip: je bovenarm kan niet meehelpen — zuiverste curl; niet explosief volledig strekken."],
+"Biceps curl (kabel)":["Sta bij de onderste katrol, stang of touw in je handen.","Krul omhoog tot je biceps samenknijpt.","Zak langzaam tegen de constante spanning in.", "Tip: de kabel houdt spanning ook onderaan — daarom fijner dan vrije gewichten voor de peesvriendelijke variant."],
+"Concentration curl":["Zit op een bank, elleboog gesteund op je binnenkant van je dij.","Krul de dumbbell omhoog.","Zak langzaam.", "Tip: puurste isolatie — niks kan meehelpen; prima om je biceps bewust te voelen."],
+"Incline dumbbell curl":["Lig op een schuine bank (± 45°) met dumbbells, armen recht naar beneden.","Krul omhoog uit de volledige stretch.","Zak langzaam terug.", "Tip: richt op de lange kop van je biceps door de armen achter je lijf."],
+"Spider curl":["Lig met je borst tegen een schuine bank, armen recht omlaag.","Krul omhoog.","Zak langzaam tot volledige stretch.", "Tip: tegenovergestelde van incline — piek van de biceps."],
+"Triceps pushdown":["Sta bij de hoge katrol, ellebogen tegen je zij.","Druk het touw of de stang naar beneden tot je armen gestrekt zijn.","Laat gecontroleerd terugkomen tot ± 90°.", "Tip: je ellebogen zijn het scharnier — ze bewegen niet."],
+"Frans drukken (skull crusher)":["Lig op de bank met de stang (of dumbbells) boven je borst.","Laat de stang zakken richting je voorhoofd door alleen je ellebogen te buigen.","Strek terug boven je borst.", "Tip: ellebogen blijven wijzen naar het plafond, niet uitwaaieren."],
+"Smal bankdrukken (close-grip)":["Pak de stang op heupbreedte.","Laat zakken naar je onderborst met ellebogen strak langs je lijf.","Duw omhoog tot gestrekte armen.", "Tip: niet op duimbreedte — dat is belastend voor je polsen; heupbreedte is genoeg."],
+"Triceps extension boven hoofd (dumbbell)":["Houd een dumbbell met beide handen boven je hoofd.","Zak hem achter je hoofd door je ellebogen te buigen.","Strek terug boven je hoofd.", "Tip: de lange kop van je triceps werk hier het hardst (armen boven je hoofd)."],
+"Triceps extension boven hoofd (kabel)":["Stel de katrol laag in, touw boven je hoofd richting het plafond.","Zak het touw achter je hoofd door je ellebogen te buigen.","Strek terug.", "Tip: constante spanning in elke positie; prima alternatief voor de dumbbell-versie."],
+"Triceps kickback":["Kom voorover gebogen, bovenarmen parallel aan de vloer.","Strek je onderarmen naar achteren tot je armen gestrekt zijn.","Zak langzaam terug.", "Tip: lichte gewichten — boven het bereik van je triceps helps niet meer."],
+"Dips (triceps gericht)":["Hang tussen de stangen met je romp rechtop.","Zak met je ellebogen strak naar achteren.","Duw omhoog tot gestrekte armen.", "Tip: rechtop = triceps; voorover = borst. Kies bewust."],
+"Diamond push-up":["Zet je handen onder je borst met duimen en wijsvingers in een diamant.","Zak tot je borst je handen raakt.","Duw omhoog.", "Tip: de zwaarste lichaamsgewicht-tricepsoefening; knieën op de vloer als hij nog te zwaar is."],
+"Squat (back squat)":["Zet de stang op je bovenrug (op de trapezius), voeten schouderbreed.","Zak door je heupen en knieën tot je dijen ± evenwijdig zijn.","Duw omhoog door je hielen, borst omhoog.", "Tip: je knieën volgen de richting van je voeten; borst blijft omhoog, rug blijft recht."],
+"Front squat":["Zet de stang op je voorschouders, ellebogen hoog.","Zak diep met een rechte romp.","Duw omhoog door je hielen.", "Tip: dwingt rechtop staan af; zware belasting voor quads en core."],
+"Goblet squat":["Houd een dumbbell of kettlebell tegen je borst.","Zak diep tussen je knieën.","Duw omhoog door je hielen.", "Tip: het gewicht voor je borst dwingt je rechtop — prima squat-leermethode."],
+"Hack squat":["Ga in de machine met je rug tegen de leuning, voeten op het platform.","Zak gecontroleerd tot ± 90° kniehoek.","Duw omhoog zonder je knieën te laten instorten.", "Tip: gestaafde squat-variant; knieën blijven in lijn met je voeten."],
+"Leg press":["Zet je voeten heupbreed op het platform.","Laat het gewicht zakken tot je knieën ± 90° zijn.","Duw uit zonder je knieën volledig te stijven.", "Tip: niet je knieën met je handen indrukken op het diepste punt; gebruik een diepte die je knieën toelaten."],
+"Leg extension":["Zit in de machine, enkelkussentjes tegen je scheenbeen.","Strek je benen tot volledige extensie.","Houd 1 seconde boven en zak langzaam terug.", "Tip: korte pauze boven maakt het verschil; niet schudden, gewoon opbouwen."],
+"Leg curl (liggend)":["Lig op je buik, enkelkussens boven je hielen.","Trek je hielen richting je billen.","Laat langzaam terug.", "Tip: heupen blijven op de bank; til niet met je romp mee."],
+"Leg curl (zittend)":["Zit in de machine met de kussens boven je bovenbenen en achter je hielen.","Trek je hielen omlaag richting je stoel.","Laat langzaam terug.", "Tip: de zittende variant rekkt je hamstrings iets meer — fijn alternatief."],
+"Bulgarian split squat":["Zet je achtervoet op een bank, voorste voet ± 60 cm voor je uit.","Zak recht omlaag tot je achterste knie de vloer bijna raakt.","Duw omhoog door je voorste voet.", "Tip: begin zonder gewicht — evenwicht is hier de echte training."],
+"Uitstappen (lunges)":["Stap ver uit met één been.","Zak tot je achterste knie de vloer bijna raakt.","Duw af met je voorste been en stap terug (of door in de volgende stap).", "Tip: korte stappen = knie, lange stappen = bil en hamstring."],
+"Opstappen op bank (step-up)":["Zet één voet volledig op een bank of kist.","Duw omhoog tot je been gestrekt is.","Zak gecontroleerd terug.", "Tip: niet afzetten met het achterste been — het bovenbeen doet al het werk."],
+"Romanian deadlift":["Houd de stang voor je lijf met lichte kniebuiging.","Duw je heupen terug en laat de stang langs je benen zakken tot je hamstrings rekt.","Kom omhoog door je heupen vooruit te duwen.", "Tip: het is een heupbeweging, geen buikbeweging — je rug blijft volledig recht."],
+"Kuitheffen (staand)":["Sta op de rand van een trede met je voorvoet, hielen in de lucht.","Zak je hielen volledig omlaag (stretch).","Duw je hielen zo hoog mogelijk omhoog.", "Tip: volledig bereik is alles: diep onderaan, piek bovenaan; pauzeer even op elk punt."],
+"Kuitheffen (zittend)":["Zit in de machine met het kussen op je knieën.","Duw je hielen omhoog.","Zak langzaam tot volledige stretch.", "Tip: gebogen knie = meer Soleus (diepe kuitspier) dan de staande variant."],
+"Kuitheffen op legpress":["Zet je voorvoeten op de onderste rand van het platform.","Duw het platform weg met alleen je voeten: hielen omhoog.","Zak je hielen ver omlaag voor de stretch.", "Tip: knieën blijven ± gestrekt; alleen je enkels bewegen."],
+"Sissy squat":["Houd je vast, hielen omhoog (op de tenen).","Zak met je romp en dijen in één lijn diep naar voren.","Duw terug omhoog.", "Tip: zwaarder dan hij eruitziet; begin met kleine diepte."],
+"Hip thrust (halter)":["Rust je bovenrug op een bank, stang op je heupen (met kussen).","Duw je heupen omhoog tot je lijf gestrekt is.","Knijp je billen 1 seconde samen boven en zak gecontroleerd.", "Tip: kin ingetrokken, ribben naar beneden — overdrijf je onderrug niet."],
+"Hip thrust (machine)":["Zet je schouders tegen de steun, voeten plat op de vloer.","Duw het kussen omhoog met je heupen tot je lijf gestrekt is.","Zak gecontroleerd terug.", "Tip: zelfde beweging als de balk-versie, maar makkelijker op te zetten."],
+"Glute bridge":["Lig op je rug, voeten plat op de vloer, knieën gebogen.","Duw je heupen omhoog tot je lijf gestrekt is.","Knijp je billen samen en zak langzaam terug.", "Tip: de thuisversie van de hip thrust; druk je hielen in de vloer."],
+"Sumo deadlift":["Zet je voeten breed, tenen naar buiten, greep binnen je knieën.","Duw je heupen terug en til de stang langs je benen.","Steek bovenaan je heupen gestrekt.", "Tip: meer bil en binnenbeen dan de gewone deadlift; rug blijft recht."],
+"Good morning":["Zet de stang op je bovenrug (squatactie).","Duw je heupen terug met lichte kniebuiging tot je hamstrings rekt.","Kom omhoog door je heupen vooruit te duwen.", "Tip: begin licht — de belasting zit hoog op je rug; pure hamstring- en bilbeweging."],
+"Cable kickback":["Zet de enkelriem aan en sta bij de lage katrol.","Duw je been naar achteren tot je bil volledig samenknijpt.","Laat langzaam terugkomen.", "Tip: kleine, beheerste beweging; je romp blijft stil."],
+"Reverse lunge":["Stap met één been ver naar achteren.","Zak tot je achterste knie de vloer bijna raakt.","Duw terug naar voren.", "Tip: vriendelijker voor je knieën dan de gewone lunge; meer bil."],
+"Hip abduction machine":["Zit in de machine, benen tegen de kussens.","Duw je benen naar buiten tot volle opening.","Laat langzaam terug.", "Tip: tilt licht achterover om meer bil te voelen."],
+"Hip adductie machine":["Zit in de machine, benen open tegen de kussens.","Breng je benen naar elkaar toe.","Laat gecontroleerd openen.", "Tip: binnenkant bovenbeen; ook nuttig voor je squat-diepte."],
+"45° back extension (billen)":["Lig in de back-extensionbank met je heupen op de pad.","Kom omhoog door je heupen te strekken (niet je rug).","Zak gecontroleerd.", "Tip: het verschil met de rug-variant zit in de beweging: heup, geen onderrug."],
+"Plank":["Steun op je onderarmen en tenen, ellebogen onder je schouders.","Span je buik, billen en rug — één rechte lijn.","Houd vast.", "Tip: 30–60 seconden strak is beter dan 3 minuten doorzakt."],
+"Side plank":["Steun op één onderarm, voeten op elkaar.","Duw je heup omhoog tot je lijf een rechte lijn is.","Houd vast en wissel van zij.", "Tip: schouder boven elleboog; heup niet laten zakken."],
+"Cable crunch":["Kniel onder de hoge katrol, touw achter je hoofd.","Krul je romp omlaag richting je knieën.","Kom gecontroleerd terug.", "Tip: krul je romp — het is geen heupbuiging."],
+"Beenheffen hangend (leg raises)":["Hang aan een stang (of steun je armen op de rek).","Heef je benen gestrekt omhoog (of je knieën als het te zwaar is).","Zak langzaam terug zonder te slingeren.", "Tip: geen momentum — als je slingeren hoort, maak het lichter met gebogen knieën."],
+"Beenheffen liggend":["Lig op je rug met je handen onder je billen (rug-bescherming).","Heef je gestrekte benen omhoog tot ± 90°.","Zak ze langzaam tot net boven de vloer.", "Tip: je onderrug blijft plat op de vloer; lukt dat niet? Heef minder diep."],
+"Russian twist":["Zit op de vloer, romp achterover leunend, voeten op de vloer (of in de lucht).","Draai je romp met gevouwen handen of een gewicht zijwaarts.","Wissel zijde om zijde.", "Tip: draai vanuit je romp, niet alleen je armen."],
+"Ab wheel rollout":["Kniel op de vloer en houd het rad voor je knieën.","Rol het rad naar voren tot je lijf bijna de vloer raakt.","Trek jezelf terug met je buikspieren.", "Tip: je onderrug blijft gefixeerd — ver weg rollen dan je buik toelaat = rugpijn."],
+"Dead bug":["Lig op je rug, armen omhoog, knieën gebogen in 90°.","Strek je rechterarm achterover terwijl je je linkerbeen strekt.","Wissel kanten langzaam af.", "Tip: je onderrug blijft de hele tijd op de vloer; traagheid is het punt."],
+"Mountain climbers":["Kom in de hoge plankpositie.","Trek je ene knie richting je borst.","Wissel kanten in een vast tempo.", "Tip: heupen laag houden; tempo omhoog maakt het een conditie-oefening."],
+"Sit-up":["Lig op je rug, knieën gebogen, voeten op de vloer.","Rol je romp van de vloer tot je rechtop zit.","Zak gecontroleerd terug.", "Tip: kruis je armen over je borst in plaats van je nek vast te pakken."],
+"Pallof press":["Sta zijwaarts bij de katrol (op borsthoogte), kabel vast in beide handen voor je borst.","Druk je gestrekte armen voor je uit en weerstand draait je naar de machine.","Houd even vast en kom terug.", "Tip: je romp mag niet meedraaien — het is een anti-rotatie oefening."],
+"Crunch op blok":["Lig met je onderrug op een blok of bank, voeten stevig.","Krul je romp kort omhoog richting je knieën.","Zak langzaam terug.", "Tip: korte beweging — je zoekt de knijp, geen grote beweging."]
+};
+
+function detailFor(name){
+  const own=db.details&&db.details[name];
+  if(own&&own.steps&&own.steps.length){
+    const x=EXERCISE_DB.find(e=>norm(e.n)===norm(name));
+    return {group:x?x.g:null,muscle:own.m?MUSCLE_LABEL[own.m]:null,steps:own.steps,tip:own.tip||null};
+  }
+  const x=EXERCISE_DB.find(e=>norm(e.n)===norm(name));
+  const a=DETAIL[name];
+  return {
+    group:x?x.g:null,
+    muscle:x?MUSCLE_LABEL[x.m]:null,
+    steps:a?a.slice(0,-1):null,
+    tip:a?a[a.length-1]:null
+  };
+}
+
+function ensureExercise(name){
+  let e=db.exercises.find(x=>norm(x.name)===norm(name));
+  if(!e){e={id:uid(),name};db.exercises.push(e);}
+  return e.id;
+}
+function openPicker(mode,tplId){
+  pickerState={mode,tplId,group:"Alle",q:"",sel:null};
+  document.getElementById("picker-search").value="";
+  renderPickerChips();renderPickerList();
+  document.getElementById("picker").classList.add("on");
+}
+function openInfo(name){openPicker("info");pickerState.sel=name;renderPickerList();}
+function closePicker(){document.getElementById("picker").classList.remove("on");pickerState.mode=null;}
+function renderPickerChips(){
+  document.getElementById("picker-chips").innerHTML=GROUPS.map(g=>
+    `<button data-g="${g}" class="${g===pickerState.group?"on":""}">${g}</button>`).join("");
+  document.querySelectorAll("#picker-chips button").forEach(b=>b.addEventListener("click",()=>{
+    pickerState.group=b.dataset.g;renderPickerChips();renderPickerList();
+  }));
+}
+const GROUP_M={chest:"Borst",back:"Rug",shoulders:"Schouders",biceps:"Biceps",triceps:"Triceps",quads:"Benen",hams:"Benen",glutes:"Bil",calves:"Benen",core:"Core"};
+function renderPickerList(){
+  const si=document.getElementById("picker-search");
+  const ch=document.getElementById("picker-chips");
+  if(pickerState.sel){si.style.display="none";ch.style.display="none";renderPickerDetail();return;}
+  si.style.display="";ch.style.display="";
+  const q=norm(pickerState.q.trim());
+  let items=EXERCISE_DB.filter(x=>{
+    const gOK=pickerState.group==="Alle"||q||x.g===pickerState.group; /* zoeken doorbreekt het groepsfilter */
+    return gOK&&(!q||norm(x.n).includes(q));
+  });
+  /* eigen oefeningen meenemen in de bibliotheeklijst */
+  const customs=db.exercises.filter(e=>!EXERCISE_DB.some(x=>norm(x.n)===norm(e.name)))
+    .map(e=>{
+      const det=db.details&&db.details[e.name];
+      const g=det&&det.m&&GROUP_M[det.m]?GROUP_M[det.m]:"Eigen";
+      return {n:e.name,g,m:det?det.m:null};
+    })
+    .filter(c=>pickerState.group==="Alle"||q||c.g===pickerState.group)
+    .filter(c=>!q||norm(c.n).includes(q));
+  items=items.concat(customs);
+  items=[...new Map(items.map(x=>[x.n,x])).values()].sort((a,b)=>a.g.localeCompare(b.g)||a.n.localeCompare(b.n));
+  const inList=name=>db.exercises.some(x=>norm(x.name)===norm(name));
+  let html=items.map(x=>{
+    const added=inList(x.n)&&pickerState.mode==="library";
+    return `<button class="p-item ${added?"added":""}" data-n="${esc(x.n)}" title="${esc(x.g)}">
+      <span>${esc(x.n)}</span><span class="g">${added?"✓ in je lijst":x.g}</span></button>`;
+  }).join("");
+  const qRaw=pickerState.q.trim();
+  if(qRaw&&!items.some(x=>norm(x.n)===norm(qRaw))){
+    html+=`<button class="p-item" data-new="${esc(qRaw)}"><span class="p-new">＋ “${esc(qRaw)}” als nieuwe oefening</span></button>`;
+  }
+  if(!html)html=`<div class="empty">Niets gevonden. Typ een naam om een eigen oefening te maken.</div>`;
+  document.getElementById("picker-list").innerHTML=html;
+  document.querySelectorAll("#picker-list .p-item").forEach(b=>b.addEventListener("click",()=>{
+    if(b.dataset.new!==undefined){pickExercise(b.dataset.new);return;}
+    pickerState.sel=b.dataset.n;renderPickerList();
+  }));
+}
+function renderPickerDetail(){
+  const name=pickerState.sel;
+  const d=detailFor(name);
+  const inList=db.exercises.some(x=>norm(x.name)===norm(name));
+  let act=null;
+  if(pickerState.mode==="template")act="Voeg toe aan schema";
+  else if(pickerState.mode==="session")act="Voeg toe aan training";
+  else if(pickerState.mode==="library"&&!inList)act="Voeg toe aan mijn lijst";
+  let html=`<button class="p-back" data-back>‹ Terug naar de lijst</button>
+    <h3>${esc(name)}</h3>
+    ${d.group?`<div class="d-group">${esc(d.group)}</div>`:""}
+    ${d.muscle?`<p class="d-muscle"><b>Spieren:</b> ${esc(d.muscle)}</p>`:""}`;
+  if(d.steps)html+=`<ol class="d-steps">${d.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol>`;
+  else if(pickerState.mode==="library"||pickerState.mode==="info")html+=renderDetailForm();
+  else html+=`<p class="d-muscle">Nog geen uitleg voor deze oefening.</p><button class="btn wide" data-openedit style="margin-top:6px">Uitleg toevoegen</button>`;
+  if(d.tip){const t=d.tip.replace(/^Tip: /,"");html+=`<div class="d-tip"><b>Aandachtspunt</b><br>${esc(t.charAt(0).toUpperCase()+t.slice(1))}</div>`;}
+  if(act)html+=`<button class="btn acc wide" data-add style="margin-top:14px">${esc(act)}</button>`;
+  document.getElementById("picker-list").innerHTML=html;
+  document.querySelector("#picker-list [data-back]").addEventListener("click",()=>{
+    pickerState.sel=null;pickerState.edit=false;renderPickerList();
+  });
+  const add=document.querySelector("#picker-list [data-add]");
+  if(add)add.addEventListener("click",()=>pickExercise(name));
+  const oe=document.querySelector("#picker-list [data-openedit]");
+  if(oe)oe.addEventListener("click",()=>openInfo(name));
+  const sf=document.querySelector("#picker-list [data-savedetail]");
+  if(sf)sf.addEventListener("click",()=>{
+    const m=document.getElementById("d-muscle").value;
+    const steps=document.getElementById("d-steps").value.split("\n").map(x=>x.trim()).filter(Boolean);
+    const tip=document.getElementById("d-tip").value.trim();
+    if(!steps.length){toast("Vul minimaal één stap in, of kies Overslaan");return;}
+    if(!db.details)db.details={};
+    db.details[name]={m,steps,tip};
+    pickerState.edit=false;save();toast("Uitleg opgeslagen");
+    renderPickerList();
+  });
+  const sk=document.querySelector("#picker-list [data-skip]");
+  if(sk)sk.addEventListener("click",()=>{
+    pickerState.edit=false;pickerState.sel=null;renderPickerList();
+  });
+}
+function renderDetailForm(){
+  const MUSSEL=Object.entries({chest:"Borst",back:"Rug",shoulders:"Schouders",biceps:"Biceps",triceps:"Triceps",quads:"Benen (voorkant)",hams:"Benen (achterkant)",glutes:"Bilspieren",calves:"Kuiten",core:"Core / buik"});
+  return `<div class="d-edit">
+    <p class="d-muscle">Deze oefening heeft nog geen uitleg. Vul hem in en hij staat voortaan gewoon in je bibliotheek.</p>
+    <div class="field"><label>Spiergroep</label><select id="d-muscle">${MUSSEL.map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select></div>
+    <div class="field"><label>Uitvoering — één stap per regel</label><textarea id="d-steps" rows="4" placeholder="Bijv. Ga rechtop staan&#10;Trek de stang omhoog&#10;Zak gecontroleerd terug"></textarea></div>
+    <div class="field"><label>Aandachtspunt (optioneel)</label><input type="text" id="d-tip" placeholder="Waar moet je op letten?"></div>
+    <button class="btn acc wide" data-savedetail>Uitleg opslaan</button>
+    <button class="btn wide" data-skip>Overslaan — later invullen</button>
+  </div>`;
+}
+function pickExercise(name){
+  const mode=pickerState.mode;
+  if(mode==="library"){
+    if(db.exercises.some(x=>norm(x.name)===norm(name))){toast("Staat al in je lijst");return;}
+    db.exercises.push({id:uid(),name});save();toast(`“${name}” toegevoegd`);
+    pickerState.sel=name;renderPickerList();renderPlan();
+  }else if(mode==="template"){
+    const t=db.templates.find(x=>x.id===pickerState.tplId);if(!t)return;
+    t.ex.push({e:name,sets:3,reps:10});ensureExercise(name);save();closePicker();renderPlan();
+  }else if(mode==="session"){
+    session.entries.push({exerciseId:ensureExercise(name),sets:[{w:db.lastWeights[name]||0,r:8,done:false}]});
+    persistDraft();closePicker();renderSession();
+  }
+}
+document.getElementById("btn-open-library").addEventListener("click",()=>openPicker("library"));
+document.getElementById("picker-search").addEventListener("input",ev=>{pickerState.q=ev.target.value;renderPickerList();});
+document.querySelectorAll("#picker [data-close]").forEach(el=>el.addEventListener("click",closePicker));
+
+/* ================= init ================= */
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+if(restoreDraft()){toast("Trainingssessie hersteld");}
+renderToday();
+renderPlan();
+</script>
+</body>
+</html>
