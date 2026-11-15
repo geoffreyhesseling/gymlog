@@ -32,7 +32,6 @@ body{
   background:var(--bg);color:var(--ink);
   font-family:-apple-system,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",sans-serif;
   font-size:1rem;line-height:1.45;
-  padding-bottom:calc(76px + env(safe-area-inset-bottom));
   -webkit-font-smoothing:antialiased;
   user-select:none;
 }
@@ -49,7 +48,7 @@ header{
 }
 header h1{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
 header .date{color:var(--ink3);font-size:.85rem}
-main{padding:0 14px}
+main{padding:0 14px calc(76px + env(safe-area-inset-bottom))}
 .view{display:none}
 .view.on{display:block}
 
@@ -376,7 +375,7 @@ select.exercise-select{margin-bottom:8px}
     </div>
     <div class="section-title">App</div>
     <div class="card">
-      <p class="muted" style="margin-bottom:12px">Gymlog <b style="color:var(--acc)">v1.7</b> — kijk hier na een update of je de nieuwe versie hebt.</p>
+      <p class="muted" style="margin-bottom:12px">Gymlog <b style="color:var(--acc)">v1.8</b> — kijk hier na een update of je de nieuwe versie hebt.</p>
       <p class="muted"><b style="color:var(--ink2)">Op je homescreen zetten (iPhone):</b> deel-knop <span style="color:var(--acc)">⎋</span> → “Zet op het beginscherm”.<br><br>
       <b style="color:var(--ink2)">Android:</b> menu ⋮ → “Toevoegen aan startscherm”.<br><br>
       De app werkt daarna volledig offline.</p>
