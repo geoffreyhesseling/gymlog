@@ -98,12 +98,16 @@ input[type=number],input[type=text],select{
 select{appearance:none;-webkit-appearance:none}
 .field label{display:block;font-size:.78rem;color:var(--ink3);margin-bottom:4px}
 
-/* steppers */
-.stepper{display:flex;align-items:center;gap:2px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.stepper button{width:34px;height:38px;font-size:1.15rem;color:var(--ink2);flex:none}
+/* steppers + gewichtsinvoer */
+.stepper{display:flex;align-items:center;gap:0;background:var(--bg2);border:1px solid var(--line);border-radius:10px;overflow:hidden;flex:none}
+.stepper button{width:28px;height:40px;font-size:1.15rem;color:var(--ink2);flex:none}
 .stepper button:active{background:var(--card2)}
-.stepper .val{min-width:52px;text-align:center;font-weight:700;font-size:1.05rem}
-.stepper .unit{color:var(--ink3);font-size:.75rem;font-weight:400;margin-left:2px}
+.stepper .val{min-width:34px;text-align:center;font-weight:700;font-size:1rem}
+.w-cell{display:flex;align-items:center;flex:1 1 60px;min-width:56px;height:40px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:0 6px}
+.w-cell input{flex:1;min-width:0;width:100%;background:none;border:none;color:var(--ink);font:inherit;font-weight:700;font-size:1rem;text-align:center;padding:0;height:100%;-moz-appearance:textfield;appearance:textfield}
+.w-cell input::-webkit-outer-spin-button,.w-cell input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.w-cell .unit{color:var(--ink3);font-size:.75rem;font-weight:400;margin-left:2px;flex:none}
+.w-cell:focus-within{border-color:var(--acc)}
 
 /* live session */
 .ex-block{margin-bottom:14px}
@@ -113,12 +117,12 @@ select{appearance:none;-webkit-appearance:none}
 .sugg{color:var(--acc);font-size:.8rem;font-weight:600;margin:-4px 0 8px}
 .prev b{color:var(--ink2);font-weight:600}
 .set-row{
-  display:flex;align-items:center;gap:8px;
+  display:flex;align-items:center;gap:6px;
   background:var(--bg2);border:1px solid var(--line);border-radius:12px;
-  padding:8px 10px;margin-bottom:7px;
+  padding:8px;margin-bottom:7px;
 }
-.set-row .idx{width:24px;height:24px;border-radius:50%;background:var(--card2);color:var(--ink2);
-  display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;flex:none}
+.set-row .idx{width:22px;height:22px;border-radius:50%;background:var(--card2);color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex:none}
 .set-row.done{border-color:rgba(91,217,138,.5)}
 .set-row.done .idx{background:var(--ok);color:#06130B}
 .done-btn{
@@ -359,6 +363,7 @@ select.exercise-select{margin-bottom:8px}
     </div>
     <div class="section-title">App</div>
     <div class="card">
+      <p class="muted" style="margin-bottom:12px">Gymlog <b style="color:var(--acc)">v1.6</b> — kijk hier na een update of je de nieuwe versie hebt.</p>
       <p class="muted"><b style="color:var(--ink2)">Op je homescreen zetten (iPhone):</b> deel-knop <span style="color:var(--acc)">⎋</span> → “Zet op het beginscherm”.<br><br>
       <b style="color:var(--ink2)">Android:</b> menu ⋮ → “Toevoegen aan startscherm”.<br><br>
       De app werkt daarna volledig offline.</p>
@@ -557,7 +562,7 @@ function renderSession(){
     const prev=lastSessionFor(en.exerciseId);
     const prevTxt=prev?`Vorige (${fmtDate(prev.date)}): `+prev.sets.map(s=>`${s.r}×${s.w} kg`).join(", "):`Eerste keer met deze oefening`;
     let sugg="";
-    if(prev){
+    if(prev&&prev.sets.length){
       const target=en.sets[0].r||8;
       const allDone=prev.sets.length>=en.sets.length&&prev.sets.every(s=>s.r>=target);
       const maxW=Math.max(...prev.sets.map(s=>s.w||0));
@@ -585,13 +590,39 @@ function renderSession(){
   wrap.querySelectorAll("[data-act]").forEach(el=>el.addEventListener("click",onSessionClick));
   wrap.querySelectorAll("[data-info]").forEach(el=>el.addEventListener("click",()=>openInfo(el.dataset.info)));
   wrap.querySelectorAll(".stepper button").forEach(b=>b.addEventListener("click",onStepClick));
+  wrap.querySelectorAll(".w-in").forEach(i=>{i.addEventListener("change",onWeightChange);i.addEventListener("keydown",ev=>{if(ev.key==="Enter")ev.currentTarget.blur();});});
 }
 
 function stepperHTML(kind,val){
-  return `<div class="stepper"><button data-kind="${kind}" data-dir="-1">−</button>
-    <span class="val num" data-kind="${kind}">${val}</span>
-    <span class="unit">${kind==="w"?"kg":""}</span>
-    <button data-kind="${kind}" data-dir="1">+</button></div>`;
+  if(kind==="w")return `<div class="w-cell"><input class="w-in num" type="text" inputmode="decimal" value="${fmtW(val)}" aria-label="Gewicht in kg"><span class="unit">kg</span></div>`;
+  return `<div class="stepper"><button data-kind="r" data-dir="-1">−</button>
+    <span class="val num" data-kind="r">${val}</span>
+    <button data-kind="r" data-dir="1">+</button></div>`;
+}
+function fmtW(v){v=+v||0;return String(Math.round(v*100)/100);}
+function parseW(txt){
+  const v=parseFloat(String(txt).trim().replace(",","."));
+  if(isNaN(v)||v<0)return null;
+  return Math.round(v*100)/100;
+}
+function onWeightChange(ev){
+  const inp=ev.currentTarget;
+  const row=inp.closest(".set-row");const ei=+row.dataset.ei,si=+row.dataset.si;
+  const st=session.entries[ei].sets[si];
+  const v=parseW(inp.value);
+  if(v===null){inp.value=fmtW(st.w);return;}
+  st.w=v;
+  inp.value=fmtW(v);
+  /* following undone sets follow weight */
+  const block=row.closest(".ex-block");
+  block.querySelectorAll(".set-row").forEach(r=>{
+    const j=+r.dataset.si;
+    if(j>si&&!session.entries[ei].sets[j].done){
+      session.entries[ei].sets[j].w=v;
+      const fi=r.querySelector(".w-in");if(fi)fi.value=fmtW(v);
+    }
+  });
+  persistDraft();
 }
 function onStepClick(ev){
   const b=ev.currentTarget;const kind=b.dataset.kind;const dir=+b.dataset.dir;
