@@ -352,6 +352,19 @@ select.exercise-select{margin-bottom:8px}
 
   <!-- ===== MEER ===== -->
   <section class="view" id="view-more">
+    <div class="section-title">Rapport</div>
+    <div class="card">
+      <p class="muted" style="margin-bottom:10px">PDF met al je voortgang: kracht per oefening, volume en frequentie per week en je lichaamsmetingen. Handig om te delen, bijvoorbeeld met een coach.</p>
+      <div class="row">
+        <select id="rp-period" class="grow">
+          <option value="56">Laatste 8 weken</option>
+          <option value="84" selected>Laatste 12 weken</option>
+          <option value="182">Laatste half jaar</option>
+          <option value="0">Alles</option>
+        </select>
+        <button class="btn" id="btn-report">Rapport maken</button>
+      </div>
+    </div>
     <div class="section-title">Gegevens</div>
     <div class="card">
       <p class="muted" style="margin-bottom:12px">Alles staat opgeslagen op je telefoon. Maak regelmatig een exportbestand als back-up (bijv. na elke maand of na het aanpassen van je schema).</p>
@@ -363,7 +376,7 @@ select.exercise-select{margin-bottom:8px}
     </div>
     <div class="section-title">App</div>
     <div class="card">
-      <p class="muted" style="margin-bottom:12px">Gymlog <b style="color:var(--acc)">v1.6</b> — kijk hier na een update of je de nieuwe versie hebt.</p>
+      <p class="muted" style="margin-bottom:12px">Gymlog <b style="color:var(--acc)">v1.7</b> — kijk hier na een update of je de nieuwe versie hebt.</p>
       <p class="muted"><b style="color:var(--ink2)">Op je homescreen zetten (iPhone):</b> deel-knop <span style="color:var(--acc)">⎋</span> → “Zet op het beginscherm”.<br><br>
       <b style="color:var(--ink2)">Android:</b> menu ⋮ → “Toevoegen aan startscherm”.<br><br>
       De app werkt daarna volledig offline.</p>
@@ -1234,6 +1247,270 @@ document.querySelectorAll("#picker [data-close]").forEach(el=>el.addEventListene
 /* ================= init ================= */
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 if(restoreDraft()){toast("Trainingssessie hersteld");}
+/* ================= rapport (PDF) ================= */
+/* ==RAPPORT== */
+const RP={ink:"#23272F",lab:"#7B8494",grid:"#E1E6ED",acc:"#E8590C",acc2:"#4A7DBF"};
+
+function pdfText(s){
+  let t=String(s);
+  t=t.replace(/≥/g,">=").replace(/≤/g,"<=").replace(/≈/g,"~")
+     .replace(/–/g,"\u0096").replace(/—/g,"\u0097")
+     .replace(/[‘’]/g,"'").replace(/[“”]/g,'"')
+     .replace(/•/g,"\u0095").replace(/€/g,"\u0080").replace(/…/g,"...");
+  t=t.replace(/[^\u0000-ÿ]/g,"?");
+  return t.replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
+}
+function nlNum(v,d){
+  d=d===undefined?1:d;
+  const p=Math.pow(10,d);
+  return String(Math.round((+v||0)*p)/p).replace(".",",");
+}
+const pdfDate=d=>d.slice(8,10)+"-"+d.slice(5,7)+"-"+d.slice(0,4);
+
+function reportData(dbase,namer,days){
+  const cutoff=days?new Date(Date.now()-days*864e5).toISOString().slice(0,10):null;
+  const inPer=d=>!cutoff||d>=cutoff;
+  const sess=dbase.sessions.filter(s=>inPer(s.date)).slice().sort((a,b)=>a.date<b.date?-1:1);
+  const byEx={};
+  sess.forEach(s=>s.entries.forEach(en=>{
+    const done=en.sets.filter(st=>st.done&&st.w>0&&st.r>0);
+    if(!done.length)return;
+    const key=en.exerciseId;
+    if(!byEx[key])byEx[key]={pts:[],best:null};
+    byEx[key].pts.push({
+      date:s.date,
+      e1:Math.max(...done.map(st=>st.w*(1+st.r/30))),
+      top:Math.max(...done.map(st=>st.w))
+    });
+    const cand=done.reduce((a,b)=>a.w*(1+a.r/30)>=b.w*(1+b.r/30)?a:b);
+    const e1c=cand.w*(1+cand.r/30);
+    if(!byEx[key].best||e1c>byEx[key].best.e1)
+      byEx[key].best={w:cand.w,r:cand.r,date:s.date,e1:e1c};
+  }));
+  const exercises=Object.entries(byEx).map(([id,x])=>({id,name:namer(id),pts:x.pts,best:x.best}))
+    .filter(x=>x.pts.length>=2).sort((a,b)=>b.pts.length-a.pts.length);
+  const weeks={};
+  sess.forEach(s=>{
+    const d=new Date(s.date);
+    const mon=new Date(d);mon.setDate(d.getDate()-((d.getDay()+6)%7));
+    const k=mon.toISOString().slice(0,10);
+    if(!weeks[k])weeks[k]={vol:0,n:0};
+    weeks[k].vol+=s.entries.reduce((a,e)=>a+e.sets.filter(st=>st.done).reduce((b,st)=>b+(st.w||0)*(st.r||0),0),0);
+    weeks[k].n++;
+  });
+  const wk=Object.keys(weeks).sort();
+  const totalVol=sess.reduce((a,s)=>a+s.entries.reduce((b,e)=>b+e.sets.filter(st=>st.done).reduce((c,st)=>c+(st.w||0)*(st.r||0),0),0),0);
+  const meas=METRICS.map(mt=>({
+    k:mt[0],label:mt[1],unit:mt[2],guide:mt[3],
+    pts:dbase.measurements.filter(m=>inPer(m.date)&&+m[mt[0]]===+m[mt[0]])
+      .sort((a,b)=>a.date<b.date?-1:1).map(m=>({date:m.date,v:+m[mt[0]]}))
+  })).filter(x=>x.pts.length>=2);
+  return {
+    days,cutoff,
+    from:sess.length?sess[0].date:null,to:sess.length?sess[sess.length-1].date:null,
+    nSessions:sess.length,totalVol,
+    perWeek:Math.round(sess.length/((wk.length||1))*10)/10,
+    weeks:wk.map(k=>({k,vol:weeks[k].vol,n:weeks[k].n})),
+    exercises,meas
+  };
+}
+
+function reportChart(vals,labels,w,h){
+  const pad={l:46,r:14,t:12,b:24};
+  const iw=w-pad.l-pad.r,ih=h-pad.t-pad.b;
+  let lo=Math.min(...vals),hi=Math.max(...vals);
+  const span=(hi-lo)||hi*0.1||1;
+  lo-=span*0.12;hi+=span*0.12;
+  const yr=hi-lo||1;
+  const pts=vals.map((v,i)=>({x:pad.l+(vals.length===1?iw/2:iw*i/(vals.length-1)),y:pad.t+ih-(v-lo)/yr*ih}));
+  const grid=[0,.5,1].map(f=>{
+    const yy=pad.t+ih-f*ih,val=lo+f*yr;
+    return `<line x1="${pad.l}" x2="${w-pad.r}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="${RP.grid}" stroke-width="1"/>`+
+      `<text x="${pad.l-8}" y="${(yy+3.5).toFixed(1)}" text-anchor="end" font-size="11" fill="${RP.lab}" font-family="Helvetica,Arial,sans-serif">${nlNum(val,1)}</text>`;
+  }).join("");
+  const thin=vals.length>7?Math.ceil(vals.length/7):1;
+  const xlab=labels.map((lb,i)=>{
+    if(i%thin&&i!==labels.length-1)return "";
+    const last=i===labels.length-1;
+    return `<text x="${last?(w-4):pts[i].x.toFixed(1)}" y="${h-7}" text-anchor="${last?"end":"middle"}" font-size="11" fill="${RP.lab}" font-family="Helvetica,Arial,sans-serif">${lb}</text>`;
+  }).join("");
+  const d=pts.map((p,i)=>(i?"L":"M")+p.x.toFixed(1)+" "+p.y.toFixed(1)).join(" ");
+  const area=`M${pts[0].x.toFixed(1)} ${(pad.t+ih).toFixed(1)} `+pts.map(p=>"L"+p.x.toFixed(1)+" "+p.y.toFixed(1)).join(" ")+` L${pts[pts.length-1].x.toFixed(1)} ${(pad.t+ih).toFixed(1)} Z`;
+  const dots=pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.2" fill="${RP.acc}"/>`).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#FFFFFF"/>`+
+    grid+`<path d="${area}" fill="${RP.acc}" opacity="0.09"/><path d="${d}" fill="none" stroke="${RP.acc}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`+dots+xlab+`</svg>`;
+}
+
+function reportBars(vals,labels,w,h,color){
+  const pad={l:46,r:14,t:16,b:24};
+  const iw=w-pad.l-pad.r,ih=h-pad.t-pad.b;
+  const hi=Math.max(...vals,1);
+  const bw=Math.min(46,iw/vals.length*0.55);
+  const bars=vals.map((v,i)=>{
+    const x=pad.l+iw*(i+0.5)/vals.length-bw/2;
+    const bh=Math.max(v/hi*ih,1);
+    const lab=vals.length<=8?`<text x="${(x+bw/2).toFixed(1)}" y="${(pad.t+ih-bh-5).toFixed(1)}" text-anchor="middle" font-size="10.5" fill="${RP.lab}" font-family="Helvetica,Arial,sans-serif">${(+v).toLocaleString("nl-NL")}</text>`:"";
+    return `<rect x="${x.toFixed(1)}" y="${(pad.t+ih-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${color}"/>`+lab;
+  }).join("");
+  const thin=vals.length>8?Math.ceil(vals.length/8):1;
+  const xlab=labels.map((lb,i)=>i%thin?"":`<text x="${(pad.l+iw*(i+0.5)/vals.length).toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="${RP.lab}" font-family="Helvetica,Arial,sans-serif">${lb}</text>`).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#FFFFFF"/>`+
+    `<line x1="${pad.l}" x2="${w-pad.r}" y1="${(pad.t+ih).toFixed(1)}" y2="${(pad.t+ih).toFixed(1)}" stroke="${RP.grid}" stroke-width="1"/>`+
+    `<line x1="${pad.l}" x2="${w-pad.r}" y1="${pad.t}" y2="${pad.t}" stroke="${RP.grid}" stroke-width="1"/>`+
+    `<text x="${pad.l-8}" y="${(pad.t+3.5).toFixed(1)}" text-anchor="end" font-size="11" fill="${RP.lab}" font-family="Helvetica,Arial,sans-serif">${hi.toLocaleString("nl-NL")}</text>`+
+    bars+xlab+`</svg>`;
+}
+
+function wrapTxt(s,max){
+  const words=String(s).split(/\s+/);const lines=[];let cur="";
+  for(const w of words){
+    if((cur?cur+" ":"").length+w.length>max){if(cur)lines.push(cur);cur=w;}
+    else cur=(cur?cur+" ":"")+w;
+  }
+  if(cur)lines.push(cur);
+  return lines;
+}
+
+function svgToJPEG(svg,w,h){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{try{
+      const c=document.createElement("canvas");c.width=w*2;c.height=h*2;
+      const x=c.getContext("2d");
+      x.fillStyle="#FFFFFF";x.fillRect(0,0,c.width,c.height);
+      x.drawImage(img,0,0,c.width,c.height);
+      res(c.toDataURL("image/jpeg",0.85));
+    }catch(e){rej(e);}};
+    img.onerror=()=>rej(new Error("Grafiek kon niet gerenderd worden"));
+    img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
+  });
+}
+
+async function buildReportPDF(rd,genDate){
+  const PW=595.28,PH=841.89,M=50,CW=PW-2*M;
+  const pages=[];let pg=null,y=0;
+  const colHex=h=>{const n=parseInt(h.slice(1),16);return((n>>16&255)/255).toFixed(3)+" "+((n>>8&255)/255).toFixed(3)+" "+((n&255)/255).toFixed(3);};
+  const T=(s,x,yy,size,f,col)=>pg.ops.push(`BT /F${f} ${size} Tf ${colHex(col)} rg 1 0 0 1 ${x.toFixed(2)} ${yy.toFixed(2)} Tm (${pdfText(s)}) Tj ET`);
+  const rule=()=>pg.ops.push(`q ${colHex("#C9D0DA")} RG 0.8 w ${M.toFixed(2)} ${y.toFixed(2)} m ${(M+CW).toFixed(2)} ${y.toFixed(2)} l S Q`);
+  function newPage(){pg={ops:[],imgs:[]};pages.push(pg);y=PH-M;}
+  function need(h){if(y-h<M+20)newPage();}
+  function section(t){need(50);y-=8;T(t,M,y,12.5,2,RP.ink);y-=8;rule();y-=18;}
+  async function chartBlock(title,lines,svg,sw,sh){
+    const hPt=CW*sh/sw;
+    need(hPt+30+(lines||[]).length*11+16);
+    y-=2;
+    if(title){T(title,M,y,11,2,RP.ink);y-=14;}
+    (lines||[]).forEach(l=>{T(l,M,y,8.5,1,RP.lab);y-=11;});
+    y-=3;
+    const num=pg.imgs.push({svg,w:sw,h:sh});
+    pg.ops.push(`q ${CW.toFixed(2)} 0 0 ${hPt.toFixed(2)} ${M.toFixed(2)} ${(y-hPt).toFixed(2)} cm /I${num} Do Q`);
+    y-=hPt+16;
+  }
+
+  newPage();
+  T("Trainingsrapport",M,y,20,2,RP.ink);y-=27;
+  const perTxt=rd.days?"Laatste "+Math.round(rd.days/7)+" weken":"Volledige historie";
+  T("Gymlog · "+perTxt+" · gegenereerd "+genDate,M,y,9,1,RP.lab);y-=22;
+  rule();y-=16;
+  section("Samenvatting");
+  ["Trainingen in deze periode: "+rd.nSessions,
+   "Totaal volume: "+rd.totalVol.toLocaleString("nl-NL")+" kg",
+   "Gemiddeld: "+nlNum(rd.perWeek,1)+" trainingen per week",
+   "Oefeningen gedaan: "+rd.exercises.length
+  ].forEach(l=>{T(l,M,y,10.5,1,RP.ink);y-=16;});
+  y-=4;
+  if(rd.exercises.some(x=>x.best)){
+    section("Personal records (zwaarste set per oefening)");
+    rd.exercises.filter(x=>x.best).sort((a,b)=>b.best.e1-a.best.e1).slice(0,8).forEach(x=>{
+      need(16);
+      T("• "+x.name+": "+x.best.r+" × "+nlNum(x.best.w,1)+" kg  ("+pdfDate(x.best.date)+")",M,y,10.5,1,RP.ink);y-=15;
+    });
+    y-=2;
+  }
+  if(rd.exercises.length){
+    newPage();
+    section("Kracht per oefening — e1RM per training");
+    const list=rd.exercises.slice(0,12);
+    for(const x of list){
+      const first=x.pts[0].e1,last=x.pts[x.pts.length-1].e1;
+      const pct=first>0?Math.round((last-first)/first*100):null;
+      const lastTop=x.pts[x.pts.length-1].top;
+      const sub="e1RM "+nlNum(first,1)+" naar "+nlNum(last,1)+" kg"+(pct===null?"":" ("+(pct>=0?"+":"")+pct+"%)")+" · laatste topgewicht "+nlNum(lastTop,1)+" kg";
+      await chartBlock(x.name,[sub],reportChart(x.pts.map(p=>p.e1),x.pts.map(p=>pdfDate(p.date)),940,420),940,420);
+    }
+    if(rd.exercises.length>12){need(18);T("...plus nog "+(rd.exercises.length-12)+" oefeningen (niet weergegeven)",M,y,8.5,1,RP.lab);y-=14;}
+  }
+  if(rd.weeks.length){
+    newPage();
+    section("Training per week");
+    await chartBlock("Volume per week (kg)",[],reportBars(rd.weeks.map(w=>w.vol),rd.weeks.map(w=>pdfDate(w.k).slice(0,5)),940,300,RP.acc),940,300);
+    await chartBlock("Trainingen per week",[],reportBars(rd.weeks.map(w=>w.n),rd.weeks.map(w=>pdfDate(w.k).slice(0,5)),940,300,RP.acc2),940,300);
+  }
+  if(rd.meas.length){
+    newPage();
+    section("Lichaamsmetingen");
+    for(const mt of rd.meas){
+      await chartBlock(mt.label+(mt.unit?" ("+mt.unit+")":""),wrapTxt(mt.guide,100).slice(0,2),reportChart(mt.pts.map(p=>p.v),mt.pts.map(p=>pdfDate(p.date)),940,420),940,420);
+    }
+  }
+  if(pg){
+    need(30);y-=2;
+    T("e1RM (geschatte max) = gewicht × (1 + herhalingen ÷ 30).",M,y,8,1,RP.lab);y-=11;
+    T("Automatisch gegenereerd door Gymlog.",M,y,8,1,RP.lab);
+  }
+  pages.forEach((p,i)=>p.ops.push(`BT /F1 8 Tf ${colHex(RP.lab)} rg 1 0 0 1 ${M.toFixed(2)} 30 Tm (${pdfText("Gymlog-trainingsrapport · pagina "+(i+1)+" van "+pages.length)}) Tj ET`));
+
+  for(const p of pages)for(const im of p.imgs)im.data=await svgToJPEG(im.svg,im.w,im.h);
+
+  const objs=[];const offs=[];
+  objs[1]="<< /Type /Catalog /Pages 2 0 R >>";
+  objs[3]="<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+  objs[4]="<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+  let n=5;
+  const layout=pages.map(p=>{const pgN=n++,ctN=n++,imgs=p.imgs.map(()=>n++);return{pgN,ctN,imgs};});
+  objs[2]="<< /Type /Pages /Kids ["+layout.map(l=>l.pgN+" 0 R").join(" ")+"] /Count "+pages.length+" >>";
+  pages.forEach((p,i)=>{
+    const {pgN,ctN,imgs}=layout[i];
+    objs[pgN]="<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "+PW.toFixed(2)+" "+PH.toFixed(2)+"] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << "+p.imgs.map((im,j)=>"/I"+(j+1)+" "+imgs[j]+" 0 R").join(" ")+" >> >> /Contents "+ctN+" 0 R >>";
+    const stream=p.ops.join("\n");
+    objs[ctN]="<< /Length "+stream.length+" >>\nstream\n"+stream+"\nendstream";
+    p.imgs.forEach((im,j)=>{
+      const raw=atob(im.data.split(",")[1]);
+      /* svgToJPEG levert 2× de logische afmetingen (canvas @2x) — deze móéten hier gedeclareerd worden */
+      objs[imgs[j]]="<< /Type /XObject /Subtype /Image /Width "+(im.w*2)+" /Height "+(im.h*2)+" /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "+raw.length+" >>\nstream\n"+raw+"\nendstream";
+    });
+  });
+  const chunks=[];let blen=0;
+  const push=s=>{chunks.push(s);blen+=s.length;};
+  push("%PDF-1.4\n%âãÏÓ\n");
+  for(let i=1;i<objs.length;i++){offs[i]=blen;push(i+" 0 obj\n"+objs[i]+"\nendobj\n");}
+  const xrefOff=blen;
+  push("xref\n0 "+objs.length+"\n");
+  push("0000000000 65535 f \n");
+  for(let i=1;i<objs.length;i++)push(String(offs[i]).padStart(10,"0")+" 00000 n \n");
+  push("trailer\n<< /Size "+objs.length+" /Root 1 0 R >>\nstartxref\n"+xrefOff+"\n%%EOF");
+  const bytes=new Uint8Array(blen);let o=0;
+  for(const c of chunks){for(let j=0;j<c.length;j++)bytes[o++]=c.charCodeAt(j)&0xFF;}
+  return bytes;
+}
+/* ==RAPPORT-EIND== */
+
+document.getElementById("btn-report").addEventListener("click",async()=>{
+  const days=+document.getElementById("rp-period").value;
+  if(db.sessions.length<2){toast("Nog te weinig trainingen voor een rapport (minimaal 2)");return;}
+  toast("Rapport maken...");
+  try{
+    const rd=reportData(db,exerciseName,days);
+    if(!rd.nSessions){toast("Geen trainingen in deze periode");return;}
+    const bytes=await buildReportPDF(rd,todayStr());
+    const blob=new Blob([bytes],{type:"application/pdf"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+    a.download="gymlog-rapport-"+todayStr()+".pdf";a.click();
+    URL.revokeObjectURL(a.href);
+    toast("Rapport gedownload — staat in je downloads");
+  }catch(e){toast("Rapport maken mislukt");console.error(e);}
+});
+
 renderToday();
 renderPlan();
 </script>
